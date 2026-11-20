@@ -141,6 +141,18 @@
     }
     let m;
     const out = r => (time != null ? Object.assign(r, { time: time }) : r);
+    const NTH = { '1st': 1, first: 1, '2nd': 2, second: 2, '3rd': 3, third: 3, '4th': 4, fourth: 4, last: -1 };
+    s = s.replace(/^every other /, 'every 2 ');
+    if (s === 'every 2 day') s = 'every 2 days';
+    if (s === 'every 2 week') s = 'every 2 weeks';
+    if (s === 'every 2 month') s = 'every 2 months';
+    if (s === 'every 2 year') s = 'every 2 years';
+    if (s === 'every weekend') return out({ freq: 'weekly', interval: 1, days: [5, 6] });
+    if (s === 'every year' || s === 'yearly' || s === 'every 1 year') return out({ freq: 'yearly', interval: 1 });
+    if ((m = /^every (\d+) years?$/.exec(s))) return out({ freq: 'yearly', interval: +m[1] });
+    if ((m = /^every (1st|2nd|3rd|4th|first|second|third|fourth|last) (\w+)(?: of the month)?$/.exec(s)) && DAYMAP[m[2]] != null)
+      return out({ freq: 'monthly', interval: 1, nth: NTH[m[1]], weekday: DAYMAP[m[2]] });
+    if (s === 'every last day' || s === 'every last day of the month') return out({ freq: 'monthly', interval: 1, monthDay: -1 });
     if (s === 'every day' || s === 'daily' || s === 'every 1 day') return out({ freq: 'daily', interval: 1 });
     if ((m = /^every (\d+) days?$/.exec(s))) return out({ freq: 'daily', interval: +m[1] });
     if (s === 'every weekday' || s === 'every workday') return out({ freq: 'weekdays', interval: 1 });
@@ -163,8 +175,10 @@
     let s;
     if (r.freq === 'daily') s = iv > 1 ? 'every ' + iv + ' days' : 'every day';
     else if (r.freq === 'weekdays') s = 'every weekday';
-    else if (r.freq === 'weekly') s = r.days && r.days.length && iv === 1 ? 'every ' + r.days.map(d => DAYS[d]).join(', ') : (iv > 1 ? 'every ' + iv + ' weeks' : 'every week');
-    else if (r.freq === 'monthly') s = r.monthDay && iv === 1 ? 'every ' + ordinal(r.monthDay) : (iv > 1 ? 'every ' + iv + ' months' : 'every month');
+    else if (r.freq === 'weekly') s = r.days && r.days.length === 2 && r.days[0] === 5 && r.days[1] === 6 && iv === 1 ? 'every weekend' : r.days && r.days.length && iv === 1 ? 'every ' + r.days.map(d => DAYS[d]).join(', ') : (iv > 1 ? 'every ' + iv + ' weeks' : 'every week');
+    else if (r.freq === 'monthly' && r.nth) s = 'every ' + (r.nth === -1 ? 'last' : ordinal(r.nth)) + ' ' + DAYS[r.weekday];
+    else if (r.freq === 'monthly') s = r.monthDay === -1 ? 'every last day' : r.monthDay && iv === 1 ? 'every ' + ordinal(r.monthDay) : (iv > 1 ? 'every ' + iv + ' months' : 'every month');
+    else if (r.freq === 'yearly') s = iv > 1 ? 'every ' + iv + ' years' : 'every year';
     else return null;
     return time != null ? s + ' at ' + hm(time) : s;
   }
@@ -183,7 +197,7 @@
       view: place.view || null, listKey: place.listKey || null, board: list ? list.board : null,
       restricted: !!(list && list.restricted),
       deadline: t.deadline && t.deadline.date ? t.deadline.date : '',
-      day: '', days: 1, time: null, dur: null, durDefault: false, repeat: null, repeatRaw: null, repeatEditable: true
+      day: '', days: 1, time: null, dur: null, durDefault: false, repeat: null, repeatString: '', repeatRaw: null, repeatEditable: true
     };
     const d = t.due;
     if (d && d.date) {
@@ -197,8 +211,9 @@
       }
       if (d.is_recurring) {
         const r = parseRepeat(d.string, d.lang);
+        task.repeatString = d.string || '';
         if (r) { const rr = Object.assign({}, r); delete rr.time; task.repeat = rr; if (task.time == null && r.time != null) task.time = r.time; }
-        else { task.repeatRaw = d.string || 'repeating'; task.repeatEditable = false; }
+        else { task.repeat = { freq: 'custom', text: d.string || '' }; task.repeatRaw = d.string || 'repeating'; task.repeatEditable = false; }
       }
     }
     if (t.duration && t.duration.unit === 'day' && t.duration.amount > 0 && task.time == null) task.days = t.duration.amount;
@@ -233,7 +248,9 @@
     if (JSON.stringify(after.labels || []) !== JSON.stringify(before.labels || [])) upd.labels = after.labels || [];
     const whenChanged = after.day !== before.day || after.time !== before.time || JSON.stringify(after.repeat) !== JSON.stringify(before.repeat);
     if (whenChanged) {
-      if (!before.repeatEditable) refused.push('repeat-not-editable');
+      const samePattern = !!after.repeat && JSON.stringify(after.repeat) === JSON.stringify(before.repeat) && !!before.repeatString;
+      // Same pattern, new date or time: move this occurrence and keep the pattern, as Todoist's reschedule does.
+      if (samePattern) upd.due = { date: after.time != null ? after.day + 'T' + hm(after.time) + ':00' : after.day, string: before.repeatString, is_recurring: true };
       else { const due = dueOf(after); if (due !== undefined) upd.due = due; }
     }
     const durChanged = after.dur !== before.dur && !(after.durDefault && before.durDefault);
@@ -267,6 +284,13 @@
   // planner date/time/repeat -> Todoist due (null clears it, undefined leaves it)
   function dueOf(t) {
     if (!t.day && !t.repeat) return null;
+    if (t.repeat && t.repeat.freq === 'custom') {
+      // Typed by the user as in Todoist; Todoist interprets it.
+      const txt = String(t.repeat.text || '').trim();
+      if (!txt) return undefined;
+      const withTime = t.time != null && !/\s(at|@)\s/i.test(txt) ? txt + ' at ' + hm(t.time) : txt;
+      return t.day ? { string: withTime + ' starting ' + t.day } : { string: withTime };
+    }
     if (t.repeat) {
       const str = repeatString(t.repeat, t.time);
       if (!str) return undefined;
@@ -274,6 +298,29 @@
     }
     if (t.time != null) return { date: t.day + 'T' + hm(t.time) + ':00' };
     return { date: t.day };
+  }
+
+  /* ---------- order ---------- */
+
+  // Order inside one Todoist list: written to Todoist. ids = task ids of the list, top to bottom.
+  function reorderCommands(ids, uuid) {
+    if (!ids || !ids.length) return [];
+    return [{ type: 'item_reorder', uuid: uuid(), args: { items: ids.map((id, i) => ({ id: id, child_order: i + 1 })) } }];
+  }
+
+  // Order in views that mix lists (Today, a day in Upcoming, a label): kept in the "Order" setting.
+  // orders: {viewKey: [taskId, ...]}. Returns the ids sorted, unknown ones after, in their given order.
+  function applyViewOrder(viewKey, ids, orders) {
+    const want = (orders && orders[viewKey]) || [];
+    const pos = new Map(want.map((id, i) => [id, i]));
+    return ids.map((id, i) => [id, pos.has(id) ? pos.get(id) : 1e9 + i]).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+  }
+  function setViewOrder(viewKey, ids, orders, existing) {
+    const next = Object.assign({}, orders || {});
+    next[viewKey] = ids.slice();
+    // forget tasks that no longer exist, so the setting stays small
+    if (existing) Object.keys(next).forEach(k => { next[k] = next[k].filter(id => existing.has(id)); if (!next[k].length) delete next[k]; });
+    return next;
   }
 
   /* ---------- lists ---------- */
@@ -315,7 +362,7 @@
 
   /* ---------- settings ---------- */
 
-  const SETTINGS = ['Zones', 'Zone grid', 'Rules', 'Sorting', 'Layout'];
+  const SETTINGS = ['Zones', 'Zone grid', 'Rules', 'Sorting', 'Layout', 'Order'];
 
   function readSettings(items, s) {
     const out = {}, ids = {};
@@ -334,6 +381,6 @@
   }
 
   const api = { parseSectionName, sectionName, checkListTitle, parseLinkedProject, classifyProject, buildStructure, placeTask,
-    parseRepeat, repeatString, fromTodoist, diffTask, dueOf, listCommands, renameBoardCommands, readSettings, writeSetting, SETTINGS, CONFIG, UNSORTED };
+    parseRepeat, repeatString, fromTodoist, diffTask, dueOf, reorderCommands, applyViewOrder, setViewOrder, listCommands, renameBoardCommands, readSettings, writeSetting, SETTINGS, CONFIG, UNSORTED };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PPMap = api;
 })(typeof window !== 'undefined' ? window : this);

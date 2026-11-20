@@ -73,12 +73,18 @@ t('repeats', () => {
   assert.deepStrictEqual(M.parseRepeat('every Monday'), { freq: 'weekly', interval: 1, days: [0] });
   assert.deepStrictEqual(M.parseRepeat('every 2 weeks'), { freq: 'weekly', interval: 2 });
   assert.deepStrictEqual(M.parseRepeat('every 15th'), { freq: 'monthly', interval: 1, monthDay: 15 });
-  assert.strictEqual(M.parseRepeat('every 3rd friday'), null);
+  assert.deepStrictEqual(M.parseRepeat('every 3rd friday'), { freq: 'monthly', interval: 1, nth: 3, weekday: 4 });
+  assert.deepStrictEqual(M.parseRepeat('every last friday'), { freq: 'monthly', interval: 1, nth: -1, weekday: 4 });
+  assert.deepStrictEqual(M.parseRepeat('every other week'), { freq: 'weekly', interval: 2 });
+  assert.deepStrictEqual(M.parseRepeat('every weekend at 10:00'), { freq: 'weekly', interval: 1, days: [5, 6], time: 600 });
+  assert.deepStrictEqual(M.parseRepeat('every year'), { freq: 'yearly', interval: 1 });
+  assert.deepStrictEqual(M.parseRepeat('every last day'), { freq: 'monthly', interval: 1, monthDay: -1 });
+  assert.strictEqual(M.parseRepeat('every 3rd thu of the quarter'), null);
   assert.strictEqual(M.parseRepeat('cada lunes', 'es'), null);
   assert.strictEqual(M.repeatString({ freq: 'weekly', interval: 1, days: [0, 2] }, 420), 'every mon, wed at 07:00');
   assert.strictEqual(M.repeatString({ freq: 'monthly', interval: 1, monthDay: 1 }), 'every 1st');
   assert.strictEqual(M.repeatString({ freq: 'daily', interval: 2 }), 'every 2 days');
-  for (const s of ['every day', 'every weekday', 'every mon, wed, fri at 07:00', 'every 2 weeks', 'every 15th', 'every 3 months at 09:30'])
+  for (const s of ['every day', 'every weekday', 'every mon, wed, fri at 07:00', 'every 2 weeks', 'every 15th', 'every 3 months at 09:30', 'every last fri', 'every 2nd tue at 18:00', 'every weekend', 'every year', 'every last day'])
     assert.strictEqual(M.repeatString(M.parseRepeat(s), M.parseRepeat(s).time), s, 'round trip ' + s);
 });
 
@@ -96,7 +102,7 @@ t('reading tasks', () => {
   x = M.fromTodoist(item({ due: { date: '2026-11-23', is_recurring: true, string: 'every mon, wed', lang: 'en' } }), S);
   assert.deepStrictEqual(x.repeat, { freq: 'weekly', interval: 1, days: [0, 2] });
   x = M.fromTodoist(item({ due: { date: '2026-11-27', is_recurring: true, string: 'every last friday', lang: 'en' } }), S);
-  assert.strictEqual(x.repeat, null); assert.strictEqual(x.repeatRaw, 'every last friday'); assert.strictEqual(x.repeatEditable, false);
+  assert.deepStrictEqual(x.repeat, { freq: 'monthly', interval: 1, nth: -1, weekday: 4 }); assert.strictEqual(x.repeatString, 'every last friday');
   x = M.fromTodoist(item({ due: { date: '2026-12-01' }, duration: { amount: 3, unit: 'day' } }), S);
   assert.strictEqual(x.days, 3); assert.strictEqual(x.dur, null);
   x = M.fromTodoist(item({ project_id: 'P3', section_id: null, deadline: { date: '2026-12-15' } }), S);
@@ -151,12 +157,24 @@ t('writing tasks', () => {
   const lc = M.fromTodoist(item({ project_id: 'P3', section_id: null }), S);
   r = M.diffTask(lc, Object.assign({}, lc, { title: 'Renamed', done: true }), S, uuid);
   assert.deepStrictEqual(types(r), ['item_update', 'item_close']);
-  // repeat Todoist wrote that the planner can't edit: date changes refused, ticking allowed
-  const raw = M.fromTodoist(item({ due: { date: '2026-11-27', is_recurring: true, string: 'every last friday', lang: 'en' } }), S);
-  r = M.diffTask(raw, Object.assign({}, raw, { day: '2026-11-28' }), S, uuid);
-  assert.deepStrictEqual(r.refused, ['repeat-not-editable']); assert.deepStrictEqual(r.commands, []);
+  // a repeat the tool doesn't expand: moving one occurrence keeps Todoist's phrase
+  const raw = M.fromTodoist(item({ due: { date: '2026-11-26', is_recurring: true, string: 'every 3rd thu of the quarter', lang: 'en' } }), S);
+  assert.deepStrictEqual(raw.repeat, { freq: 'custom', text: 'every 3rd thu of the quarter' });
+  r = M.diffTask(raw, Object.assign({}, raw, { day: '2026-11-27', time: 600, dur: 60 }), S, uuid);
+  assert.deepStrictEqual(r.refused, []);
+  assert.deepStrictEqual(r.commands[0].args.due, { date: '2026-11-27T10:00:00', string: 'every 3rd thu of the quarter', is_recurring: true });
+  // typing a new custom phrase hands it to Todoist
+  r = M.diffTask(raw, Object.assign({}, raw, { repeat: { freq: 'custom', text: 'every 2nd tue' } }), S, uuid);
+  assert.deepStrictEqual(r.commands[0].args.due, { string: 'every 2nd tue starting 2026-11-26' });
   r = M.diffTask(raw, Object.assign({}, raw, { done: true }), S, uuid);
   assert.deepStrictEqual(types(r), ['item_close']);
+  // a known repeat: moving one occurrence also keeps the original phrase
+  const wk = M.fromTodoist(item({ due: { date: '2026-11-23T07:00:00', is_recurring: true, string: 'every mon, wed at 7am', lang: 'en' } }), S);
+  r = M.diffTask(wk, Object.assign({}, wk, { day: '2026-11-24' }), S, uuid);
+  assert.deepStrictEqual(r.commands[0].args.due, { date: '2026-11-24T07:00:00', string: 'every mon, wed at 7am', is_recurring: true });
+  // changing the pattern itself writes a new phrase
+  r = M.diffTask(wk, Object.assign({}, wk, { repeat: { freq: 'weekly', interval: 1, days: [1, 3] } }), S, uuid);
+  assert.deepStrictEqual(r.commands[0].args.due, { string: 'every tue, thu at 07:00 starting 2026-11-23' });
   // new task and new subtask
   r = M.diffTask(null, { id: 'tmp1', title: 'New', notes: '', priority: 1, labels: [], listKey: 's:S2', day: '2026-11-22', time: null, days: 2 }, S, uuid);
   assert.deepStrictEqual(r.commands[0].args, { content: 'New', description: '', priority: 4, labels: [], project_id: 'P1', section_id: 'S2', due: { date: '2026-11-22' }, duration: { amount: 2, unit: 'day' } });
@@ -193,6 +211,16 @@ t('settings', () => {
   assert.deepStrictEqual(r.ids, { Zones: 'C1', Sorting: 'C2' });
   assert.deepStrictEqual(M.writeSetting('Zones', [], S, r.ids, uuid).args, { id: 'C1', description: '[]' });
   assert.deepStrictEqual(M.writeSetting('Rules', [], S, r.ids, uuid, 'tmpR').args, { content: 'Rules', description: '[]', project_id: 'P1', section_id: 'S4' });
+});
+
+t('order', () => {
+  const r = M.reorderCommands(['A', 'B', 'C'], uuid);
+  assert.deepStrictEqual(r[0].type, 'item_reorder');
+  assert.deepStrictEqual(r[0].args.items, [{ id: 'A', child_order: 1 }, { id: 'B', child_order: 2 }, { id: 'C', child_order: 3 }]);
+  const orders = M.setViewOrder('today', ['C', 'A'], {}, new Set(['A', 'B', 'C']));
+  assert.deepStrictEqual(M.applyViewOrder('today', ['A', 'B', 'C'], orders), ['C', 'A', 'B']);
+  assert.deepStrictEqual(M.setViewOrder('today', ['C', 'X'], orders, new Set(['C'])), { today: ['C'] });
+  assert.ok(M.SETTINGS.includes('Order'));
 });
 
 console.log(n + ' groups passed');

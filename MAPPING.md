@@ -41,7 +41,7 @@ These projects belong to another system (ADMIN_LCDLS is synced with Notion by a 
 | `priority` 4 / 3 / 2 / 1 | P1 / P2 / P3 / P4 (Todoist stores P1 as 4) |
 | `labels` | Labels |
 | `parent_id` | Subtask of |
-| `child_order` | Manual order |
+| `child_order` | Manual order inside a list, written back to Todoist, so its apps show the same order |
 | `checked` | Done |
 | `deadline` | Shown as a flag, read-only |
 | `due` = `YYYY-MM-DD` | Date, no time (all-day) |
@@ -58,13 +58,12 @@ These projects belong to another system (ADMIN_LCDLS is synced with Notion by a 
 
 ### Repeats
 
-Pool & Plan understands these Todoist repeat phrases (English) and can edit them:
+Todoist interprets every repeat; Pool & Plan never rewrites one on its own guess.
 
-`every day`, `every 3 days`, `every weekday` / `every workday`, `every week`, `every 2 weeks`, `every mon, wed, fri`, `every monday`, `every month`, `every 2 months`, `every 15th` — each optionally followed by `at 07:00`.
-
-Anything else (`every 3rd friday`, `every other …`, phrases in another language) is kept exactly as written: the planner shows the next date and the repeat icon, lets you tick it off, but leaves the date and repeat to be edited in Todoist.
-
-Completing a repeating task in Pool & Plan completes that occurrence, exactly like ticking it in Todoist.
+- **Changing the pattern:** pick a common repeat from the menu, or choose *Custom* and type exactly what you would type in Todoist (`every 2nd tue`, `every 3rd thu of the quarter`, …). The phrase goes to Todoist unchanged, and Todoist works out the dates.
+- **Moving one occurrence** (dragging a repeating task to another day or time) sends the new date together with the unchanged phrase. Todoist moves that occurrence and keeps the pattern, like its own *reschedule*.
+- **Completing** a repeating task completes that occurrence, exactly like ticking it in Todoist.
+- **Drawing future occurrences** is the one thing Pool & Plan works out itself, to show a repeat across the week or month. It understands `every day`, `every 3 days`, `every weekday`, `every weekend`, `every week`, `every other week`, `every 2 weeks`, `every mon, wed, fri`, `every month`, `every 15th`, `every last day`, `every 2nd tue`, `every last friday`, `every year`, `every 2 years`, each optionally with `at 07:00`. For any other phrase it shows the next date only. That is a display limit; editing is never refused.
 
 ## Settings (`NOTES Config`)
 
@@ -77,6 +76,7 @@ One task per setting. The task name is the setting; its description holds the da
 | `Rules` | Automation rules |
 | `Sorting` | Sorting chosen for each board |
 | `Layout` | Board order and colours |
+| `Order` | Your manual order in views that mix lists: Today, each day in Upcoming, each label |
 
 These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but is not needed.
 
