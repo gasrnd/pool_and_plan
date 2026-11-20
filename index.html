@@ -10,7 +10,7 @@
 /* Layout: one-screen planner. Left rail = project board (sections as lanes), right = day / week / month calendar.
    Commitment reads by weight: focus bands are a wash, task sessions are tinted, fixed events are solid ink. */
 :root{
-  --bg:#EEF1F4; --surface:#FFFFFF; --sunk:#E3E8ED; --line:#D3DAE1; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
+  --bg:#E8EBF0; --surface:#F6F8FA; --sunk:#DCE1E8; --line:#CBD2DB; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
   --accent:#0B7A85; --accent-ink:#FFFFFF; --band:rgba(226,160,30,.20); --band-ink:#7A5200; --now:#D6364B;
   --p1:#2F6FDE; --p2:#0E8F6E; --p3:#B5580F; --p4:#A23BB5; --p5:#C2334D; --p6:#5B6B7F;
   --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -38,7 +38,7 @@ button.pri{background:var(--accent);border-color:var(--accent);color:var(--accen
 button.danger{color:var(--now)}
 button.mini{padding:1px 7px;font-size:12px;border-radius:6px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input[type=text],input[type=date],input[type=time],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;width:100%}
+input[type=text],input[type=password],input[type=date],input[type=time],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;width:100%}
 
 .top{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;white-space:nowrap}
 .top>*{flex:none}
@@ -77,6 +77,10 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 .menu .pop{position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px;display:flex;flex-direction:column;gap:2px;min-width:170px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .menu .pop button{border:0;text-align:left;font-size:13px}
 .menu .pop button:hover{background:var(--sunk)}
+.brandmenu summary.brand{color:var(--ink);border:0;background:transparent;padding:2px 4px;margin-left:-4px;font-size:16px;line-height:1.3;border-radius:6px;display:flex;align-items:center;gap:4px}
+.brandmenu summary.brand:hover{background:var(--sunk)}
+.brandmenu summary.brand i{font-style:normal;font-size:11px;color:var(--mute)}
+.brandmenu .pop{position:fixed;min-width:180px}
 #main.board .railrow{max-width:620px}
 #board{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
 #main.board #board{display:flex;flex-direction:row;align-items:flex-start}
@@ -107,6 +111,8 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;cursor:grab;user-select:none;min-width:0}
 .card:hover{border-color:var(--mute)}
 .card-top{display:flex;gap:7px;align-items:flex-start}
+.acc{display:flex;flex-direction:column;gap:4px}
+.acc-new input[type=password]{flex:1 1 180px;width:auto}
 .nview{min-height:2.4em;padding:6px 9px;border:1px solid var(--line);border-radius:6px;cursor:text;line-height:1.5;overflow-wrap:anywhere}
 .nview:hover{border-color:var(--mute)}
 .nview p{margin:0 0 6px}.nview p:last-child{margin-bottom:0}
@@ -263,7 +269,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <body>
 
 <header class="top">
-  <div class="brand">Pool <span>&amp;</span> Plan</div>
+  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button></div></details>
   <div class="tabs">
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
@@ -293,7 +299,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
-      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button><button type="button" data-act="tdAccounts" id="m-accounts" hidden>Todoist accounts\u2026</button></div></details>
+      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button></div></details>
       <select id="sort-sel" class="sm" aria-label="Sorting"></select>
       <label class="chk sm"><input type="checkbox" id="flt-unsched"> No date</label>
       <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label>
@@ -521,7 +527,7 @@ function tdBuild(){
 }
 function tdStop(){TD.on=false;clearInterval(TD.timer);TD.timer=0}
 function tdRun(){
-  TD.on=true;$('#m-sync').hidden=false;$('#m-accounts').hidden=false;
+  TD.on=true;$('#m-sync').hidden=false;
   clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
 }
 async function tdStart(){
@@ -552,23 +558,39 @@ $('#cform').addEventListener('submit',async e=>{
 });
 function openAccounts(){
   curTask=null;reopen=openAccounts;
-  const rows=TD.accounts.map((a,i)=>'<div class="li"><span><b>'+esc(accName(a))+'</b>'+(a.label&&a.email?' · '+esc(a.email):'')+(i===0?' · main':'')+
-    ' · '+(a.error==='auth'?'token not accepted':a.error?'not reachable':a.lastOk?'synced '+hm(new Date(a.lastOk).getHours()*60+new Date(a.lastOk).getMinutes()):'not synced yet')+'</span>'+
-    '<button type="button" data-act="tdRemove" data-id="'+i+'">Remove</button></div>').join('');
+  if(!window.PPMap){openDlg('Accounts','<div class="hint">Todoist accounts can be connected on the website version of Pool &amp; Plan.</div>',null);return}
+  const status=a=>a.error==='auth'?'token not accepted':a.error?'not reachable':a.lastOk?'synced '+hm(new Date(a.lastOk).getHours()*60+new Date(a.lastOk).getMinutes()):'not synced yet';
+  const rows=TD.accounts.map((a,i)=>'<div class="acc"><div class="li"><span><b>'+esc(accName(a))+'</b>'+(a.label&&a.email?' · '+esc(a.email):'')+(i===0?' · main':'')+' · '+status(a)+'</span>'+
+    '<button type="button" data-act="tdRetoken" data-id="'+i+'">Replace token</button><button type="button" data-act="tdRemove" data-id="'+i+'">Remove</button></div>'+
+    '<div class="row acc-new" id="acc-new-'+i+'" hidden><input type="text" name="username" autocomplete="username" value="'+esc(accName(a))+'" hidden aria-hidden="true" tabindex="-1">'+
+    '<input type="password" id="acc-tok-'+i+'" autocomplete="current-password" placeholder="New Todoist API token" aria-label="New token for '+esc(accName(a))+'">'+
+    '<button type="button" data-act="tdRetokenSave" data-id="'+i+'">Save token</button></div></div>').join('');
   const body='<div class="hint">The first account is the main one: its Inbox and its NOTES Config settings are used. Boards with the same name are shown together; each list stays in its own account.</div>'+
-    '<div class="list">'+rows+'</div><h3>Add an account</h3>'+
+    '<div class="list">'+(rows||'<div class="hint">No accounts connected.</div>')+'</div><div class="hint" id="f-accmsg"></div><h3>Add an account</h3>'+
     '<input type="text" id="f-accname" name="username" autocomplete="username" placeholder="Account name, e.g. gas_rnd" aria-label="Account name">'+
     '<input type="password" id="f-acctoken" name="password" autocomplete="current-password" placeholder="Todoist API token" aria-label="Todoist API token">'+
     '<div class="hint" id="f-accerr"></div>';
-  openDlg('Todoist accounts',body,fd=>{
+  openDlg('Accounts',body,fd=>{
     const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Connecting…';
     tdAddAccount(($('#f-accname').value||'').trim(),($('#f-acctoken').value||'').trim()).then(err=>{
       btn.disabled=false;btn.textContent='Add account';
       if(err){$('#f-accerr').textContent=err;return}
-      toast('Account added.');openAccounts();
+      $('#connect').hidden=true;toast('Account added.');openAccounts();
     });
     return false;
   },{saveLabel:'Add account',focus:false});
+}
+// Replaces one account's token after checking it belongs to the same Todoist account.
+async function tdReplaceToken(i,tok){
+  const a=TD.accounts[i];if(!a)return 'That account is no longer connected.';
+  if(!tok)return 'Paste the new token first.';
+  const probe=tdNewAcc(a.label,tok);
+  try{const j=await tdFetch(probe,true);tdMerge(probe,j)}
+  catch(x){return x.code==='auth'?'Todoist didn’t accept that token. Check you copied all of it.':x.code==='offline'?'Todoist can’t be reached. Check your connection and try again.':'Todoist answered with an error. Try again in a minute.'}
+  if(a.email&&probe.email&&a.email!==probe.email)return 'That token belongs to '+probe.email+', not '+a.email+'. Add it as a new account instead.';
+  probe.lastOk=Date.now();TD.accounts[i]=probe;tdSave();
+  if(!TD.on)tdRun();
+  TD.lastOk=Date.now();tdBuild();return '';
 }
 
 async function initStore(){
@@ -1059,6 +1081,7 @@ function syncForm(){
   form.querySelectorAll('[data-t]').forEach(n=>{const i=form.querySelector('.tf[data-g="'+n.dataset.t+'"] input'),noT=!!i&&!i.value;if(noT)n.hidden=true;else if(!n.dataset.when)n.hidden=false});
 }
 form.addEventListener('change',syncForm);
+$('#app-menu').addEventListener('toggle',e=>{const d=e.target;if(!d.open)return;const r=$('#app-menu-btn').getBoundingClientRect(),pop=d.querySelector('.pop');pop.style.left=Math.max(8,r.left)+'px';pop.style.top=(r.bottom+4)+'px'});
 function notesEdit(){const v=$('#f-nview'),ta=$('#f-notes');if(!v||!ta)return;v.hidden=true;ta.hidden=false;ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
 form.addEventListener('click',e=>{if(e.target.closest('#f-nview')&&!e.target.closest('a.lk'))notesEdit()});
 form.addEventListener('keydown',e=>{if(e.target.id==='f-nview'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();notesEdit()}});
@@ -1336,10 +1359,19 @@ const ACT={
   newSection:()=>openProject(null),
   tdSyncNow:()=>{if(TD.on)tdSync(false).then(()=>toast('Synced with Todoist.')).catch(()=>{})},
   tdAccounts:()=>openAccounts(),
+  tdRetoken:(b,id)=>{const r=$('#acc-new-'+id);if(!r)return;r.hidden=!r.hidden;if(!r.hidden){const i=$('#acc-tok-'+id);if(i)i.focus()}},
+  tdRetokenSave:(b,id)=>{
+    const i=$('#acc-tok-'+id);b.disabled=true;b.textContent='Checking\u2026';
+    tdReplaceToken(+id,(i&&i.value||'').trim()).then(err=>{
+      b.disabled=false;b.textContent='Save token';
+      if(err){$('#f-accmsg').textContent=err;return}
+      $('#connect').hidden=true;toast('Token replaced.');openAccounts();
+    });
+  },
   tdRemove:(b,id)=>{
     if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to remove';return}
     TD.accounts.splice(+id,1);tdSave();
-    if(!TD.accounts.length){tdStop();dlg.close();items=new Map();render();$('#m-sync').hidden=true;$('#m-accounts').hidden=true;showConnect('All accounts removed. Paste a token to connect again.');return}
+    if(!TD.accounts.length){tdStop();dlg.close();items=new Map();render();$('#m-sync').hidden=true;showConnect('All accounts removed. Paste a token to connect again.');return}
     tdBuild();openAccounts();
   },
   editSection:(b,id)=>openSection(id),
