@@ -32,6 +32,17 @@ These projects belong to another system (ADMIN_LCDLS is synced with Notion by a 
 - Tasks inside can be edited and completed as usual; the Notion routine carries the change over.
 - Tasks cannot be dragged into or out of the list, because that would move them between Todoist projects and break the Notion sync.
 
+## Several Todoist accounts
+
+Pool & Plan can read more than one Todoist account (⋯ menu → Todoist accounts). The first one connected is the **main** account.
+
+- Each account is read with the same rules as above.
+- **Boards with the same name are shown together.** ADMIN from one account and ADMIN from another become one ADMIN board holding the lists of both.
+- **Every list stays in its own account.** Lists from other accounts carry the account's name, e.g. "LCDLS · gas_rnd". Tasks are saved back to the account they came from.
+- **Only the main account's Inbox and settings** (`NOTES Config`) are used. Other accounts contribute their lists only.
+- **Moving a task between accounts is not possible**: Todoist can't move a task from one account to another, and copying would lose its comments, history and any Notion link. Dragging between lists of different accounts is blocked.
+- **Placing a project from another account on a board:** a project like `LCDLS` that carries no board in its name shows as its own board. Dragging it onto another board (coming with write-back) records the placement in the `Layout` setting.
+
 ## Tasks
 
 | Todoist field | Pool & Plan |

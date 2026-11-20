@@ -229,8 +229,8 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .cbox p,.cbox ol{margin:0;color:var(--mute);line-height:1.5}
 .cbox ol{padding-left:20px}
 .cbox a{color:var(--accent)}
-.cbox form{display:flex;gap:8px}
-.cbox input{flex:1}
+.cbox form{display:flex;flex-direction:column;gap:8px}
+.cbox form button{align-self:flex-start}
 .cerr{color:var(--now)!important}
 .menu .pop button[hidden]{display:none}
 @media (max-width:560px){
@@ -273,7 +273,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
-      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button><button type="button" data-act="tdDisconnect" id="m-disconnect" hidden>Disconnect Todoist</button></div></details>
+      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button><button type="button" data-act="tdAccounts" id="m-accounts" hidden>Todoist accounts\u2026</button></div></details>
       <select id="sort-sel" class="sm" aria-label="Sorting"></select>
       <label class="chk sm"><input type="checkbox" id="flt-unsched"> No date</label>
       <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label>
@@ -291,12 +291,13 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
       <li>Open <a href="https://app.todoist.com/app/settings/integrations/developer" target="_blank" rel="noopener">Todoist settings → Integrations → Developer</a>.</li>
       <li>Copy your API token and paste it below.</li>
     </ol>
-    <form id="cform" novalidate>
-      <input type="password" id="ctoken" placeholder="Todoist API token" aria-label="Todoist API token" autocomplete="off">
+    <form id="cform" class="cform2" novalidate autocomplete="on">
+      <input type="text" id="cname" name="username" autocomplete="username" placeholder="Account name, e.g. gas_rm" aria-label="Account name">
+      <input type="password" id="ctoken" name="password" autocomplete="current-password" placeholder="Todoist API token" aria-label="Todoist API token">
       <button class="pri" id="cbtn">Connect</button>
     </form>
     <p class="cerr" id="cerr" hidden></p>
-    <p>The token is kept in this browser only. Anyone who has it can read and change your Todoist, so don't share it.</p>
+    <p>The token is kept in this browser only. Anyone who has it can read and change your Todoist, so don't share it. If your browser clears site data when it closes, let your password manager save it: the account name is the username and the token is the password. You can add more Todoist accounts later from the \u22ef menu.</p>
   </div>
 </div>
 <dialog id="dlg"><form id="dform" novalidate></form></dialog>
@@ -369,96 +370,152 @@ function put(id,obj){
   items.set(id,obj);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).set(obj));render()}
 function del(id){if(TD.on){tdReadOnly();render();return}items.delete(id);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).delete());render()}
 
-/* ---------- Todoist (website only; read-only for now) ---------- */
-const TD={on:false,token:'',syncToken:'*',raw:{projects:new Map(),sections:new Map(),items:new Map()},S:null,busy:false,lastOk:0,error:'',timer:0,warned:0};
-const TDKEY='poolplan.todoist';
-function tdReadOnly(){const fresh=Date.now()-TD.warned>4000;TD.warned=Date.now();if(fresh){toast('Read-only for now: changes aren\u2019t saved to Todoist yet.')}}
+/* ---------- Todoist (website only; read-only for now) ----------
+   Several accounts can be connected. The first is the main one: its Inbox and its NOTES Config settings are used.
+   Boards with the same name merge; every list belongs to one account. */
+const TD={on:false,accounts:[],busy:false,timer:0,warned:0,lastOk:0,taskAcc:new Map(),settings:null};
+const TDKEY='poolplan.todoist.accounts';
+function tdReadOnly(){const fresh=Date.now()-TD.warned>4000;TD.warned=Date.now();if(fresh){toast('Read-only for now: changes aren’t saved to Todoist yet.')}}
+function tdNewAcc(label,token){return {label:label||'',token:token,syncToken:'*',raw:{projects:new Map(),sections:new Map(),items:new Map()},lastOk:0,error:'',email:''}}
+function tdSave(){try{localStorage.setItem(TDKEY,JSON.stringify(TD.accounts.map(a=>({label:a.label,token:a.token}))))}catch(e){}}
+function tdLoadSaved(){
+  let list=[];try{list=JSON.parse(localStorage.getItem(TDKEY)||'[]')||[]}catch(e){}
+  try{const old=localStorage.getItem('poolplan.todoist');if(old&&!list.length){list=[{label:'',token:old}]}if(old)localStorage.removeItem('poolplan.todoist')}catch(e){}
+  return list.filter(x=>x&&x.token).map(x=>tdNewAcc(x.label,x.token));
+}
+const accName=a=>a.label||a.email||'Todoist account';
 function showConnect(msg){
   const c=$('#connect');c.hidden=false;const e=$('#cerr');e.hidden=!msg;e.textContent=msg||'';
-  setTimeout(()=>{const i=$('#ctoken');if(i)i.focus()},50);
+  setTimeout(()=>{const i=$('#cname');if(i&&!i.value)i.focus();else{const t=$('#ctoken');if(t)t.focus()}},50);
 }
-async function tdFetch(full){
-  const body=new URLSearchParams({sync_token:full?'*':TD.syncToken,resource_types:JSON.stringify(['projects','sections','items'])});
+async function tdFetch(acc,full){
+  const body=new URLSearchParams({sync_token:full?'*':acc.syncToken,resource_types:JSON.stringify(['user','projects','sections','items'])});
   let r;
-  try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+TD.token},body:body})}
+  try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
   catch(e){const er=new Error('offline');er.code='offline';throw er}
   if(r.status===401||r.status===403){const er=new Error('auth');er.code='auth';throw er}
   if(r.status===429){const er=new Error('busy');er.code='busy';throw er}
   if(!r.ok){const er=new Error('http '+r.status);er.code='http';throw er}
   return r.json();
 }
-function tdMerge(j){
-  if(j.full_sync){TD.raw.projects.clear();TD.raw.sections.clear();TD.raw.items.clear()}
-  [['projects','projects'],['sections','sections'],['items','items']].forEach(([k,m])=>{
-    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k==='projects'&&o.is_archived)||(k==='sections'&&o.is_archived))TD.raw[m].delete(o.id);else TD.raw[m].set(o.id,o)});
+function tdMerge(acc,j){
+  if(j.full_sync){acc.raw.projects.clear();acc.raw.sections.clear();acc.raw.items.clear()}
+  if(j.user&&j.user.email)acc.email=j.user.email;
+  ['projects','sections','items'].forEach(k=>{
+    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k!=='items'&&o.is_archived))acc.raw[k].delete(o.id);else acc.raw[k].set(o.id,o)});
   });
-  if(j.sync_token)TD.syncToken=j.sync_token;
+  if(j.sync_token)acc.syncToken=j.sync_token;
+}
+async function tdSyncAcc(acc,full){
+  try{const j=await tdFetch(acc,full||!acc.lastOk);tdMerge(acc,j);acc.lastOk=Date.now();acc.error=''}
+  catch(e){acc.error=e.code||'http'}
 }
 async function tdSync(full){
   if(TD.busy)return;TD.busy=true;
   try{
-    const j=await tdFetch(full||!TD.lastOk);tdMerge(j);
-    TD.lastOk=Date.now();TD.error='';tdBuild();
-  }catch(e){
-    TD.error=e.code||'http';
-    if(e.code==='auth'){tdStop();try{localStorage.removeItem(TDKEY)}catch(x){}showConnect('Todoist didn\u2019t accept that token. Copy it again from Todoist and paste it here.');}
-    renderStrip();
-    throw e;
+    for(const a of TD.accounts)await tdSyncAcc(a,full);
+    const main=TD.accounts[0];
+    if(main&&main.error==='auth'){tdStop();showConnect('Todoist didn’t accept the token for '+accName(main)+'. Copy it again from Todoist and paste it here.');}
+    if(TD.accounts.some(a=>a.lastOk))TD.lastOk=Math.max.apply(null,TD.accounts.map(a=>a.lastOk));
+    tdBuild();
   }finally{TD.busy=false}
 }
 function tdBuild(){
-  const P=window.PPMap,projects=[...TD.raw.projects.values()],sections=[...TD.raw.sections.values()],its=[...TD.raw.items.values()];
-  let S=P.buildStructure(projects,sections,null);
-  const set=P.readSettings(its,S),v=set.values;
-  if(v.Layout&&Array.isArray(v.Layout.boardOrder))S=P.buildStructure(projects,sections,v.Layout);
-  TD.S=S;TD.settings=set;
-  const m=new Map(),colors=(v.Layout&&v.Layout.colors)||{};
-  S.boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,
-    sections:b.lists.filter(l=>!l.root).map(l=>({id:l.key,name:l.restricted?l.title+' \u00b7 restricted':l.title}))}));
-  its.forEach(t=>{
-    const x=P.fromTodoist(t,S);if(x.view==='config'||x.view==='hidden')return;
-    const list=x.listKey?S.listsByKey.get(x.listKey):null;
-    const task={kind:'task',title:x.title,notes:x.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
-      projectId:list?'b:'+list.board:'',sectionId:list&&!list.root?list.key:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted};
-    if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;if(x.days>1)task.days=x.days}
-    else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
-    m.set(t.id,task);
+  const P=window.PPMap,m=new Map(),merged=new Map();TD.taskAcc=new Map();
+  const structs=TD.accounts.map(a=>P.buildStructure([...a.raw.projects.values()],[...a.raw.sections.values()],null));
+  const main=TD.accounts[0],S0=structs[0];
+  const set=main&&S0?P.readSettings([...main.raw.items.values()],S0):{values:{},ids:{}},v=set.values;TD.settings=set;
+  const many=TD.accounts.length>1;
+  structs.forEach((S,ai)=>S.boards.forEach(b=>{
+    if(!merged.has(b.name))merged.set(b.name,{name:b.name,lists:[],first:merged.size});
+    b.lists.forEach(l=>{
+      const own=S.projectRole.get(l.projectId),sameProj=b.lists.filter(x=>x.projectId===l.projectId).length;
+      let title=l.title;if(l.root)title=sameProj>1?'No list':(own&&own.kind==='board'?own.board:l.title);
+      merged.get(b.name).lists.push({key:ai+'|'+l.key,title:title+(many&&ai>0?' · '+accName(TD.accounts[ai]):'')+(l.restricted?' · restricted':''),board:b.name});
+    });
+  }));
+  const want=(v.Layout&&Array.isArray(v.Layout.boardOrder))?v.Layout.boardOrder:[];
+  const boards=[...merged.values()].sort((a,b)=>{
+    const ia=want.indexOf(a.name),ib=want.indexOf(b.name);if(ia!==ib)return (ia<0?1e9:ia)-(ib<0?1e9:ib);
+    if(a.name===P.UNSORTED||b.name===P.UNSORTED)return a.name===P.UNSORTED?1:-1;return a.first-b.first});
+  const colors=(v.Layout&&v.Layout.colors)||{};
+  boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,sections:b.lists.map(l=>({id:l.key,name:l.title}))}));
+  TD.accounts.forEach((a,ai)=>{
+    const S=structs[ai];
+    a.raw.items.forEach(t=>{
+      const x=P.fromTodoist(t,S);if(x.view==='config'||x.view==='hidden')return;
+      if(x.view==='inbox'&&ai>0)return;            // only the main account's Inbox is shown
+      const list=x.listKey?S.listsByKey.get(x.listKey):null;
+      const task={kind:'task',title:x.title,notes:x.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
+        projectId:list?'b:'+list.board:'',sectionId:list?ai+'|'+x.listKey:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted,acc:ai};
+      if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;if(x.days>1)task.days=x.days}
+      else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
+      m.set(t.id,task);TD.taskAcc.set(t.id,ai);
+    });
   });
   (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
   if(v['Zone grid'])m.set('zonegrid',{kind:'zonegrid',days:v['Zone grid']});
   (Array.isArray(v.Rules)?v.Rules:[]).forEach((r,i)=>m.set(r.id||('r'+i),Object.assign({kind:'rule'},r)));
-  const prev=items.get('prefs');
-  m.set('prefs',prev||{kind:'prefs',sort:v.Sorting||{}});
+  m.set('prefs',items.get('prefs')||{kind:'prefs',sort:v.Sorting||{}});
   items=m;loaded=true;render();
 }
 function tdStop(){TD.on=false;clearInterval(TD.timer);TD.timer=0}
-async function tdStart(){
-  TD.on=true;loaded=false;items=new Map();render();
-  $('#m-sync').hidden=false;$('#m-disconnect').hidden=false;
-  try{await tdSync(true)}catch(e){loaded=true;render();if(e.code==='auth')return}
+function tdRun(){
+  TD.on=true;$('#m-sync').hidden=false;$('#m-accounts').hidden=false;
   clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
 }
+async function tdStart(){
+  TD.on=true;loaded=false;items=new Map();render();tdRun();
+  await tdSync(true).catch(()=>{});loaded=true;render();
+}
 document.addEventListener('visibilitychange',()=>{if(TD.on&&!document.hidden&&Date.now()-TD.lastOk>15000)tdSync(false).catch(()=>{})});
+// Adds an account after checking its token. Returns an error message or ''.
+async function tdAddAccount(label,tok){
+  if(!tok)return 'Paste a Todoist API token first.';
+  if(TD.accounts.some(a=>a.token===tok))return 'That account is already connected.';
+  const acc=tdNewAcc(label,tok);
+  try{const j=await tdFetch(acc,true);tdMerge(acc,j);acc.lastOk=Date.now()}
+  catch(x){return x.code==='auth'?'Todoist didn’t accept that token. Check you copied all of it.':x.code==='offline'?'Todoist can’t be reached. Check your connection and try again.':'Todoist answered with an error. Try again in a minute.'}
+  if(TD.accounts.some(a=>a.email&&a.email===acc.email))return 'That account is already connected.';
+  TD.accounts.push(acc);tdSave();TD.lastOk=Date.now();
+  if(!TD.on)tdRun();
+  tdBuild();return '';
+}
 $('#cform').addEventListener('submit',async e=>{
-  e.preventDefault();const tok=$('#ctoken').value.trim();
-  if(!tok){showConnect('Paste your Todoist API token first.');return}
-  const b=$('#cbtn');b.disabled=true;b.textContent='Connecting\u2026';
-  TD.token=tok;
-  try{const j=await tdFetch(true);try{localStorage.setItem(TDKEY,tok)}catch(x){}
-    $('#connect').hidden=true;$('#ctoken').value='';TD.on=true;tdMerge(j);TD.lastOk=Date.now();tdBuild();
-    $('#m-sync').hidden=false;$('#m-disconnect').hidden=false;
-    clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
-  }catch(x){
-    TD.token='';
-    showConnect(x.code==='auth'?'Todoist didn\u2019t accept that token. Check you copied all of it.':x.code==='offline'?'Todoist can\u2019t be reached. Check your connection and try again.':'Todoist answered with an error. Try again in a minute.');
-  }finally{b.disabled=false;b.textContent='Connect'}
+  e.preventDefault();
+  const b=$('#cbtn');b.disabled=true;b.textContent='Connecting…';
+  TD.accounts=TD.accounts.filter(a=>a.error!=='auth');
+  const err=await tdAddAccount($('#cname').value.trim(),$('#ctoken').value.trim());
+  b.disabled=false;b.textContent='Connect';
+  if(err){showConnect(err);return}
+  $('#connect').hidden=true;$('#ctoken').value='';
 });
+function openAccounts(){
+  curTask=null;reopen=openAccounts;
+  const rows=TD.accounts.map((a,i)=>'<div class="li"><span><b>'+esc(accName(a))+'</b>'+(a.label&&a.email?' · '+esc(a.email):'')+(i===0?' · main':'')+
+    ' · '+(a.error==='auth'?'token not accepted':a.error?'not reachable':a.lastOk?'synced '+hm(new Date(a.lastOk).getHours()*60+new Date(a.lastOk).getMinutes()):'not synced yet')+'</span>'+
+    '<button type="button" data-act="tdRemove" data-id="'+i+'">Remove</button></div>').join('');
+  const body='<div class="hint">The first account is the main one: its Inbox and its NOTES Config settings are used. Boards with the same name are shown together; each list stays in its own account.</div>'+
+    '<div class="list">'+rows+'</div><h3>Add an account</h3>'+
+    '<input type="text" id="f-accname" name="username" autocomplete="username" placeholder="Account name, e.g. gas_rnd" aria-label="Account name">'+
+    '<input type="password" id="f-acctoken" name="password" autocomplete="current-password" placeholder="Todoist API token" aria-label="Todoist API token">'+
+    '<div class="hint" id="f-accerr"></div>';
+  openDlg('Todoist accounts',body,fd=>{
+    const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Connecting…';
+    tdAddAccount(($('#f-accname').value||'').trim(),($('#f-acctoken').value||'').trim()).then(err=>{
+      btn.disabled=false;btn.textContent='Add account';
+      if(err){$('#f-accerr').textContent=err;return}
+      toast('Account added.');openAccounts();
+    });
+    return false;
+  },{saveLabel:'Add account',focus:false});
+}
 
 async function initStore(){
   if(window.PPMap){
-    let tok='';try{tok=localStorage.getItem(TDKEY)||''}catch(e){}
-    if(!tok){loaded=true;render();showConnect('');return}
-    TD.token=tok;return tdStart();
+    TD.accounts=tdLoadSaved();
+    if(!TD.accounts.length){loaded=true;render();showConnect('');return}
+    return tdStart();
   }
   let db=null;
   try{db=window.claude&&window.claude.use?await window.claude.use('db'):null}catch(e){}
@@ -566,12 +623,13 @@ function renderTop(){
 }
 function renderStrip(){
   const s=$('#strip'),parts=[];
-  if(TD.on||TD.token){
+  if(TD.on){
     if(!loaded)parts.push('Loading from Todoist\u2026');
-    else if(TD.error==='offline')parts.push('Todoist can\u2019t be reached. Showing what was loaded last; trying again every minute.');
-    else if(TD.error==='busy')parts.push('Todoist asked to slow down. Trying again in a minute.');
-    else if(TD.error)parts.push('Todoist answered with an error. Trying again in a minute.');
-    if(loaded&&TD.on)parts.push('Read-only preview of your Todoist: look around freely, nothing is saved back yet.'+(TD.lastOk?' Last synced '+hm(new Date(TD.lastOk).getHours()*60+new Date(TD.lastOk).getMinutes())+'.':''));
+    TD.accounts.forEach((a,i)=>{
+      if(!a.error||(i===0&&a.error==='auth'))return;
+      parts.push((TD.accounts.length>1?accName(a)+': ':'')+(a.error==='auth'?'Todoist didn\u2019t accept the token. Open \u22ef \u2192 Todoist accounts to replace it.':a.error==='offline'?'Todoist can\u2019t be reached; showing what was loaded last, trying again every minute.':a.error==='busy'?'Todoist asked to slow down; trying again in a minute.':'Todoist answered with an error; trying again in a minute.'));
+    });
+    if(loaded)parts.push('Read-only preview of your Todoist: look around freely, nothing is saved back yet.'+(TD.lastOk?' Last synced '+hm(new Date(TD.lastOk).getHours()*60+new Date(TD.lastOk).getMinutes())+'.':''));
     s.hidden=!parts.length;s.innerHTML=parts.map(p=>'<span>'+esc(p)+'</span>').join('');return;
   }
   if(!loaded)parts.push('Loading your planner…');
@@ -1212,11 +1270,12 @@ const ACT={
   newLane:()=>{st.addIn='newlist';renderBoard();const i=$('#lane-add-input');if(i)i.focus()},
   newSection:()=>openProject(null),
   tdSyncNow:()=>{if(TD.on)tdSync(false).then(()=>toast('Synced with Todoist.')).catch(()=>{})},
-  tdDisconnect:b=>{
-    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to disconnect';const dm=b.closest('details.menu');setTimeout(()=>{if(dm)dm.open=true},0);return}
-    tdStop();TD.token='';TD.lastOk=0;TD.syncToken='*';try{localStorage.removeItem(TDKEY)}catch(e){}
-    items=new Map();render();showConnect('Disconnected. Paste a token to connect again.');
-    b.dataset.armed='';b.textContent='Disconnect Todoist';$('#m-sync').hidden=true;b.hidden=true;
+  tdAccounts:()=>openAccounts(),
+  tdRemove:(b,id)=>{
+    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to remove';return}
+    TD.accounts.splice(+id,1);tdSave();
+    if(!TD.accounts.length){tdStop();dlg.close();items=new Map();render();$('#m-sync').hidden=true;$('#m-accounts').hidden=true;showConnect('All accounts removed. Paste a token to connect again.');return}
+    tdBuild();openAccounts();
   },
   editSection:(b,id)=>openSection(id),
   delSection:(b,id)=>{const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
