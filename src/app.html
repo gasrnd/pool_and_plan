@@ -7,18 +7,18 @@
 :root{
   --bg:#E8EBF0; --surface:#F6F8FA; --sunk:#DCE1E8; --line:#CBD2DB; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
   --accent:#0B7A85; --accent-ink:#FFFFFF; --band:rgba(226,160,30,.20); --band-ink:#7A5200; --now:#D6364B;
-  --p1:#2F6FDE; --p2:#0E8F6E; --p3:#B5580F; --p4:#A23BB5; --p5:#C2334D; --p6:#5B6B7F;
+  --p1:#2E8B57; --p2:#12827F; --p3:#7A4FC4; --p4:#B23D8E; --p5:#8B5E34; --p6:#6E7F1F; --dtoday:#0E8F6E; --dtom:#B5580F;
   --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   --hh:48px; --r:8px;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --p1:#7FA8FF; --p2:#4FD0A8; --p3:#F0A060; --p4:#D58BE6; --p5:#FF8598; --p6:#A8B6C6; color-scheme:dark } }
+  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --p1:#7FA8FF; --p2:#4FD0A8; --p3:#F0A060; --p4:#D58BE6; --p5:#FF8598; --p6:#A8B6C6; color-scheme:dark }
+  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark }
 
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -63,6 +63,10 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 .railrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .railrow select.sm{flex:1 1 0;width:auto;min-width:0;padding:3px 4px;font-size:12px}
 .railrow #sort-sel{flex:0 0 6.2em}
+#proj-sel.bd,#proj-sel option.bd{color:var(--pc)}
+#proj-sel.vis,#proj-sel option.vis{color:var(--mute)}
+#proj-sel option{font-weight:600}
+#proj-sel option:not(.bd):not(.vis){color:var(--ink)}
 .chk.sm{font-size:12px;gap:4px;white-space:nowrap;flex:none}
 #side>.railrow{flex-wrap:nowrap}
 .fld>span.tf{font-size:14px;color:var(--ink)}
@@ -79,13 +83,14 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 #main.board .railrow{max-width:620px}
 #board{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
 #main.board #board{display:flex;flex-direction:row;align-items:flex-start}
-#main.board #board .lane{flex:1 0 230px}
+#main.board #board .lane{flex:0 0 auto;width:var(--lw,290px);max-width:440px}
 #main.board #board .newlane{flex:0 0 78px;width:auto}
 #main.board #board .newlane:has(form){flex-basis:230px}
 .lane{background:var(--sunk);border-radius:var(--r);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid transparent}
 .lane.drop{border-color:var(--accent)}
 .lane-h{display:flex;align-items:center;gap:8px;padding:0 2px}
-.lane-h b{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;overflow-wrap:anywhere}
+.lane-h b{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;overflow-wrap:normal;word-break:normal}
+.ltag{font-size:10px;letter-spacing:.04em;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:0 6px;white-space:nowrap;text-transform:none}
 .lane-h i{font-style:normal;color:var(--mute);font-variant-numeric:tabular-nums;flex:1}
 .lane-h.mv{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .plus{align-self:flex-start;border:0;background:transparent;color:var(--mute);font-size:19px;line-height:1;padding:1px 8px 3px;border-radius:6px}
@@ -116,11 +121,11 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 .nview code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--sunk);border-radius:4px;padding:0 3px}
 .nview u,.card-t u{text-decoration-thickness:2px;text-underline-offset:2px}
 .lk{text-decoration:underline;text-underline-offset:2px;color:inherit}
-a.lk{color:var(--accent);text-decoration-thickness:1px}
+a.lk{color:color-mix(in srgb,var(--ink) 72%,var(--accent));text-decoration-thickness:1px}
 a.lk:hover{text-decoration-thickness:2px}
 .card-t code,.blk-t code,.chip code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--sunk);border-radius:4px;padding:0 3px}
-.card-t b,.blk-t b{font-weight:700}
-.card-t{font-weight:500;font-size:15px;line-height:1.3;overflow-wrap:anywhere;flex:1;min-width:0}
+.card-t b,.blk-t b,.chip b,.nview b{font-weight:600}
+.card-t{font-weight:400;font-size:15px;line-height:1.3;overflow-wrap:anywhere;flex:1;min-width:0}
 .is-done .card-t,.is-done>span{text-decoration:line-through;color:var(--mute)}
 .card-m{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;color:var(--mute);font-size:11px;margin-top:3px;padding-left:24px}
 .card-m .late{color:var(--now);font-weight:600}
@@ -135,7 +140,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .sub .tk{width:14px;height:14px;font-size:9px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--pc);flex:none;display:inline-block}
 .p0{--pc:var(--mute)}.p1{--pc:var(--p1)}.p2{--pc:var(--p2)}.p3{--pc:var(--p3)}.p4{--pc:var(--p4)}.p5{--pc:var(--p5)}.p6{--pc:var(--p6)}
-.board #board.hz,#board.hz{display:grid;grid-auto-flow:column;grid-auto-columns:86%;align-items:start;overflow:auto;scroll-snap-type:x proximity}
+.board #board.hz,#board.hz{display:grid;grid-auto-flow:column;grid-auto-columns:min(86%,var(--lwp,340px));align-items:start;overflow:auto;scroll-snap-type:x proximity}
 #main.board #board.hz{grid-auto-columns:minmax(230px,1fr)}
 #board.hz .lane{scroll-snap-align:start}
 #board.hz .newlane{width:78px;justify-self:start}
@@ -143,7 +148,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .lane.is-today .lane-h b{color:var(--accent)}
 .ic{width:11px;height:11px;flex:none}
 .mi{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
-.c-today{color:color-mix(in srgb,var(--p2) 42%,var(--mute))}.c-tom{color:color-mix(in srgb,var(--p3) 42%,var(--mute))}.c-week{color:color-mix(in srgb,var(--later) 45%,var(--mute))}.c-late{color:color-mix(in srgb,var(--now) 58%,var(--mute))}.c-rec{color:color-mix(in srgb,var(--p1) 38%,var(--mute))}.c-lab{color:color-mix(in srgb,var(--accent) 38%,var(--mute))}
+.c-today{color:color-mix(in srgb,var(--dtoday) 42%,var(--mute))}.c-tom{color:color-mix(in srgb,var(--dtom) 42%,var(--mute))}.c-week{color:color-mix(in srgb,var(--later) 45%,var(--mute))}.c-late{color:color-mix(in srgb,var(--now) 58%,var(--mute))}.c-rec{color:var(--mute)}.c-lab{color:color-mix(in srgb,var(--accent) 38%,var(--mute))}
 .ins{height:3px;border-radius:2px;background:var(--accent);margin:-2px 0;flex:none}
 .ghost{position:fixed;z-index:50;pointer-events:none;opacity:.92;transform:rotate(1.5deg);box-shadow:0 8px 24px rgba(0,0,0,.25)}
 
@@ -161,7 +166,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .chip[data-task]{cursor:grab}
 .card,.blk,.chip{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .allday .gut{grid-column:1;grid-row:1;align-self:center}
-.chip{border-radius:5px;padding:1px 6px;font-size:12px;font-weight:500;margin:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;min-width:0;border:1px solid transparent}
+.chip{border-radius:5px;padding:1px 6px;font-size:12px;font-weight:400;margin:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;min-width:0;border:1px solid transparent}
 .chip.ev{background:var(--ink);color:var(--surface)}
 .chip.se{background:var(--surface);border-color:color-mix(in srgb,var(--pc) 55%,var(--surface));color:var(--ink)}
 .chip.dl{border-color:var(--now);color:var(--now);background:var(--surface)}
@@ -174,12 +179,12 @@ a.lk:hover{text-decoration-thickness:2px}
 .band span{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--pc,var(--band-ink));padding:2px 5px;white-space:nowrap}
 .now{position:absolute;left:0;right:0;height:2px;background:var(--now);z-index:4;pointer-events:none}
 .blk{position:absolute;border-radius:5px;padding:2px 5px 6px;overflow:hidden;cursor:grab;user-select:none;z-index:2;font-size:12px;line-height:1.25;min-width:0}
-.blk-t{font-weight:600;overflow-wrap:anywhere}
+.blk-t{font-weight:500;overflow-wrap:anywhere}
 .blk-h{font-variant-numeric:tabular-nums;opacity:.8}
 .blk.ev{background:var(--ink);color:var(--surface);border:1px solid var(--ink)}
 .blk.se{background:var(--surface);border:1px solid color-mix(in srgb,var(--pc) 55%,var(--surface));color:var(--ink);padding-left:24px}
 .blk.se,.chip.se{border-color:var(--prc,var(--mute))}
-.allday .chip.se{color:var(--prc,var(--mute));font-weight:600}
+.allday .chip.se{color:var(--prc,var(--mute));font-weight:400}
 .blk.se{color:var(--ink)}
 .blk.se.pr1,.blk.se.pr2,.blk.se.pr3,.chip.se.pr1,.chip.se.pr2,.chip.se.pr3{background:color-mix(in srgb,var(--prc) 6%,var(--surface))}
 .blk.se.is-done{opacity:.55}
@@ -439,9 +444,9 @@ function writeErr(e){
 }
 function chain(id,fn){const p=(queues.get(id)||Promise.resolve()).then(fn).catch(writeErr);queues.set(id,p)}
 function put(id,obj){
-  if(TD.on){if(obj&&obj.kind==='prefs'){items.set(id,obj);touch();render();return}tdReadOnly();render();return}
+  if(TD.on){tdPut(id,obj);return}
   items.set(id,obj);touch();if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).set(obj));render()}
-function del(id){if(TD.on){tdReadOnly();render();return}items.delete(id);touch();if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).delete());render()}
+function del(id){if(TD.on){tdDel(id);return}items.delete(id);touch();if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).delete());render()}
 
 /* ---------- Todoist (website only; read-only for now) ----------
    Several accounts can be connected. The first is the main one: its Inbox and its NOTES Config settings are used.
@@ -484,7 +489,7 @@ async function tdSyncAcc(acc,full){
   catch(e){acc.error=e.code||'http'}
 }
 async function tdSync(full){
-  if(TD.busy)return;TD.busy=true;
+  if(TD.busy||TD.sending||TD.queue.length||TD.dirty.size)return;TD.busy=true;
   try{
     for(const a of TD.accounts)await tdSyncAcc(a,full);
     const main=TD.accounts[0];
@@ -507,15 +512,19 @@ function tdBuildInner(){TD.buildError='';
     b.lists.forEach(l=>{
       const own=S.projectRole.get(l.projectId),sameProj=b.lists.filter(x=>x.projectId===l.projectId).length;
       let title=l.title;if(l.root)title=sameProj>1?'No list':(own&&own.kind==='board'?own.board:l.title);
-      merged.get(b.name).lists.push({key:ai+'|'+l.key,title:title+(many&&ai>0?' · '+accName(TD.accounts[ai]):'')+(l.restricted?' · restricted':''),board:b.name});
+      merged.get(b.name).lists.push({key:ai+'|'+l.key,title:title,tag:(many&&ai>0?accName(TD.accounts[ai]):'')+(l.restricted?(many&&ai>0?' \u00b7 ':'')+'restricted':''),board:b.name});
     });
   }));
+  TD.structs=structs;TD.layout=Object.assign({},v.Layout||{});
+  (TD.layout.boards||[]).forEach(n=>{if(!merged.has(n))merged.set(n,{name:n,lists:[],first:merged.size})});
+  const lo=TD.layout.listOrder||{};
+  merged.forEach(b=>{const w=lo[b.name];if(Array.isArray(w))b.lists.sort((x,y)=>{const i=w.indexOf(x.key),j=w.indexOf(y.key);return (i<0?1e9:i)-(j<0?1e9:j)})});
   const want=(v.Layout&&Array.isArray(v.Layout.boardOrder))?v.Layout.boardOrder:[];
   const boards=[...merged.values()].sort((a,b)=>{
     const ia=want.indexOf(a.name),ib=want.indexOf(b.name);if(ia!==ib)return (ia<0?1e9:ia)-(ib<0?1e9:ib);
     if(a.name===P.UNSORTED||b.name===P.UNSORTED)return a.name===P.UNSORTED?1:-1;return a.first-b.first});
   const colors=(v.Layout&&v.Layout.colors)||{};
-  boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,sections:b.lists.map(l=>({id:l.key,name:l.title}))}));
+  boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,sections:b.lists.map(l=>({id:l.key,name:l.title,tag:l.tag||''}))}));
   TD.accounts.forEach((a,ai)=>{
     const S=structs[ai];
     a.raw.items.forEach(t=>{
@@ -532,19 +541,208 @@ function tdBuildInner(){TD.buildError='';
   (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
   if(v['Zone grid'])m.set('zonegrid',{kind:'zonegrid',days:v['Zone grid']});
   (Array.isArray(v.Rules)?v.Rules:[]).forEach((r,i)=>m.set(r.id||('r'+i),Object.assign({kind:'rule'},r)));
-  m.set('prefs',items.get('prefs')||{kind:'prefs',sort:v.Sorting||{}});
+  m.set('prefs',{kind:'prefs',sort:Object.assign({},v.Sorting||{},(items.get('prefs')||{}).sort||{})});
   items=m;touch();loaded=true;render();
 }
 function tdStop(){TD.on=false;clearInterval(TD.timer);TD.timer=0}
+
+/* ---------- Todoist write-back ----------
+   Every change is turned into Todoist Sync commands by todoist-mapping.js and sent to the account the task or list belongs to.
+   Changes made in the same moment (for example "clear the date" then "add a time block") are combined into one. */
+const tdUuid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'u'+Date.now().toString(36)+Math.random().toString(36).slice(2);
+const accOfKey=k=>{const i=String(k||'').indexOf('|');return i>0?+String(k).slice(0,i):null};
+const listOfKey=k=>{const i=String(k||'').indexOf('|');return i>0?String(k).slice(i+1):null};
+TD.queue=[];TD.dirty=new Map();TD.dirtyTimer=0;TD.sending=false;TD.sendError='';TD.layout={};TD.structs=[];TD.setTimers={};
+const REFUSED={'restricted-move':'Tasks can’t be moved in or out of a restricted list.','no-target':'Pick a list for this task first.','title-caps':'List titles can’t be all capitals: capitals mark the board.','title-empty':'Give the list a name.','not-a-section':'This list can’t be renamed or deleted here; it is a whole Todoist project.','board-not-caps':'Board names are written in capitals.','no-pool-project':'There is no POOL project in Todoist to put the list in.','some-lists-live-elsewhere':'Lists from other projects or accounts keep their names.'};
+const refusedMsg=c=>REFUSED[c]||'Todoist can’t do that change.';
+function tdAccOfTask(id,t){
+  if(TD.taskAcc.has(id))return TD.taskAcc.get(id);
+  const k=accOfKey(t&&t.sectionId);if(k!=null)return k;
+  if(t&&t.parentId&&TD.taskAcc.has(t.parentId))return TD.taskAcc.get(t.parentId);
+  return 0;
+}
+function tdMarkDirty(id){TD.dirty.set(id,true);clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0)}
+// planner task + its time block -> the mapping's task, next to what Todoist has now
+function tdTaskPair(id){
+  const t=items.get(id),ai=tdAccOfTask(id,t),S=TD.structs[ai],acc=TD.accounts[ai],P=window.PPMap;
+  const r=acc&&acc.raw.items.get(id),before=r?P.fromTodoist(r,S):null;
+  if(!t)return {ai:ai,before:before,after:null};
+  const a=Object.assign({},before||{repeatEditable:true,repeatString:'',durDefault:false,days:1},{id:id,title:t.title,notes:t.notes||'',priority:t.priority||4,labels:t.labels||[],parentId:t.parentId||'',done:!!t.done,order:t.order});
+  let lk=listOfKey(t.sectionId);
+  if(!lk&&t.projectId){const b=items.get(t.projectId);const first=b&&(b.sections||[]).find(x=>accOfKey(x.id)===ai);if(first)lk=listOfKey(first.id)}
+  if(lk&&accOfKey(t.sectionId)!=null&&accOfKey(t.sectionId)!==ai)return {ai:ai,before:before,after:a,crossAccount:true};
+  if(lk){a.listKey=lk;a.view=null}else{a.listKey=null;a.view='inbox'}
+  const ses=items.get('s:'+id);
+  if(ses){a.day=ses.date;a.time=ses.start;a.dur=ses.dur;a.repeat=ses.repeat||null;a.days=1;a.durDefault=!!(before&&before.durDefault&&before.dur===ses.dur&&before.time!=null)}
+  else{a.day=t.day||'';a.time=null;a.dur=null;a.durDefault=false;a.repeat=t.recur||null;a.days=t.days||1}
+  if(before&&JSON.stringify(a.repeat)===JSON.stringify(before.repeat))a.repeat=before.repeat;
+  return {ai:ai,before:before,after:a};
+}
+function tdFlushDirty(){
+  const ids=[...TD.dirty.keys()];TD.dirty.clear();
+  // parents before their subtasks, so new subtasks can point at new parents
+  ids.sort((a,b)=>{const ta=items.get(a),tb=items.get(b);return (ta&&ta.parentId?1:0)-(tb&&tb.parentId?1:0)});
+  const byAcc=new Map(),reorder=new Map();
+  ids.forEach(id=>{
+    const pr=tdTaskPair(id);
+    if(pr.crossAccount){toast('Tasks can’t move between Todoist accounts.');tdBuild();return}
+    if(!pr.before&&!pr.after)return;
+    const r=window.PPMap.diffTask(pr.before,pr.after,TD.structs[pr.ai],tdUuid);
+    if(r.refused.length){toast(refusedMsg(r.refused[0]));if(!r.commands.length)tdBuild()}
+    r.commands.forEach(c=>{if(c.type==='item_add'&&c.args&&c.args.due==null)delete c.args.due});
+    if(r.commands.length){if(!byAcc.has(pr.ai))byAcc.set(pr.ai,[]);byAcc.get(pr.ai).push(...r.commands)}
+    // manual order inside a list goes to Todoist
+    if(pr.after&&pr.before&&pr.after.order!==pr.before.order&&!pr.after.parentId&&!r.refused.length){
+      const key=pr.ai+'|'+(pr.after.listKey||'inbox');if(!reorder.has(key))reorder.set(key,{ai:pr.ai,sec:pr.after.listKey?pr.ai+'|'+pr.after.listKey:''});
+    }
+  });
+  reorder.forEach(o=>{
+    const ids=byKind('task').filter(e=>!e[1].parentId&&TD.taskAcc.get(e[0])===o.ai&&(o.sec?e[1].sectionId===o.sec:!e[1].sectionId&&!e[1].projectId))
+      .sort((a,b)=>(a[1].order||0)-(b[1].order||0)).map(e=>e[0]).filter(x=>TD.accounts[o.ai].raw.items.has(x));
+    if(ids.length>1){if(!byAcc.has(o.ai))byAcc.set(o.ai,[]);byAcc.get(o.ai).push(...window.PPMap.reorderCommands(ids,tdUuid))}
+  });
+  byAcc.forEach((cmds,ai)=>tdSend(ai,cmds));
+}
+function tdSend(ai,cmds){
+  if(!cmds||!cmds.length)return;
+  for(let i=0;i<cmds.length;i+=90)TD.queue.push({ai:ai,email:(TD.accounts[ai]||{}).email||'',cmds:cmds.slice(i,i+90)});
+  tdSaveQueue();renderStrip();tdFlushQueue();
+}
+function tdSaveQueue(){try{localStorage.setItem('poolplan.queue',JSON.stringify(TD.queue))}catch(e){}}
+function tdLoadQueue(){try{const q=JSON.parse(localStorage.getItem('poolplan.queue')||'[]')||[];TD.queue=q.map(j=>{const ai=TD.accounts.findIndex(a=>a.email&&a.email===j.email);return ai>=0?Object.assign({},j,{ai:ai}):null}).filter(Boolean)}catch(e){TD.queue=[]}}
+async function tdFlushQueue(){
+  if(TD.sending||!TD.queue.length)return;TD.sending=true;let changed=false;
+  try{
+    while(TD.queue.length){
+      const job=TD.queue[0],acc=TD.accounts[job.ai];
+      if(!acc){TD.queue.shift();continue}
+      const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items'])});
+      let r;
+      try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
+      catch(e){TD.sendError='offline';break}
+      if(r.status===429||r.status>=500){TD.sendError='busy';break}
+      if(r.status===401||r.status===403){TD.sendError='auth';acc.error='auth';break}
+      TD.queue.shift();changed=true;
+      if(!r.ok){toast('Todoist refused a change (error '+r.status+'). It was dropped; your Todoist is unchanged.');continue}
+      const j=await r.json();
+      const bad=Object.values(j.sync_status||{}).filter(x=>x!=='ok');
+      if(bad.length)toast('Todoist didn’t accept a change: '+((bad[0]&&(bad[0].error||bad[0].error_tag))||'unknown reason')+'.');
+      tdMerge(acc,j);acc.lastOk=Date.now();TD.lastOk=Date.now();TD.sendError='';
+    }
+  }finally{TD.sending=false;tdSaveQueue();if(changed&&!TD.dirty.size)tdBuild();else renderStrip()}
+}
+// Settings live in NOTES Config of the main account, one task per setting.
+function tdSaveSetting(name,value,now){
+  clearTimeout(TD.setTimers[name]);
+  TD.setTimers[name]=setTimeout(()=>{
+    const S=TD.structs[0],P=window.PPMap;if(!S)return;
+    if(!S.poolProjectId){toast('Settings need a POOL project in the main Todoist account.');return}
+    const ids=(TD.settings&&TD.settings.ids)||{},cmds=[];
+    let sec=S.configSectionId;
+    if(!sec){sec='cfg-'+tdUuid();cmds.push({type:'section_add',uuid:tdUuid(),temp_id:sec,args:{name:'NOTES Config',project_id:S.poolProjectId}})}
+    cmds.push(P.writeSetting(name,value,Object.assign({},S,{configSectionId:sec}),ids,tdUuid,'set-'+tdUuid()));
+    tdSend(0,cmds);
+  },now?0:700);
+}
+function tdSaveKind(k){
+  if(k==='zone')tdSaveSetting('Zones',byKind('zone').sort((a,b)=>(a[1].order||0)-(b[1].order||0)).map(([id,z])=>({id:id,name:z.name,color:z.color,order:z.order})));
+  else if(k==='zonegrid'){const g=items.get('zonegrid');tdSaveSetting('Zone grid',g?g.days:{})}
+  else if(k==='rule')tdSaveSetting('Rules',byKind('rule').map(([id,r])=>{const o=Object.assign({id:id},r);delete o.kind;return o}));
+}
+function tdSaveLayout(){tdSaveSetting('Layout',TD.layout)}
+// Boards and lists
+function tdPutBoard(id,p){
+  const P=window.PPMap,old=items.get(id),name=String(p.name||'').trim().toUpperCase();
+  if(!name){toast('Give the board a name.');render();return}
+  if(!old){ // a new board: its lists become POOL sections "BOARD List"
+    const S=TD.structs[0],cmds=[];
+    (p.sections||[]).forEach(x=>{const r=P.listCommands('add',S,tdUuid,{board:name,title:x.name});if(r.refused.length)toast(refusedMsg(r.refused[0])+(r.suggestion?' Try “'+r.suggestion+'”.':''));cmds.push(...r.commands)});
+    TD.layout.boards=[...new Set((TD.layout.boards||[]).concat([name]))];
+    if(p.color)(TD.layout.colors=TD.layout.colors||{})[name]=p.color;
+    tdSaveLayout();
+    items.set('b:'+name,Object.assign({},p,{name:name,sections:[]}));touch();st.proj='b:'+name;saveUi();render();
+    if(cmds.length)tdSend(0,cmds);
+    return;
+  }
+  const cmds=new Map(),add=(ai,c)=>{if(!c.length)return;if(!cmds.has(ai))cmds.set(ai,[]);cmds.get(ai).push(...c)};
+  let layoutChanged=false;
+  if(name!==old.name){
+    TD.accounts.forEach((a,ai)=>{const r=P.renameBoardCommands(TD.structs[ai],tdUuid,old.name,name);add(ai,r.commands)});
+    ['colors','listOrder'].forEach(k=>{const o=TD.layout[k];if(o&&o[old.name]!=null){o[name]=o[old.name];delete o[old.name]}});
+    if(Array.isArray(TD.layout.boards))TD.layout.boards=TD.layout.boards.map(b=>b===old.name?name:b);
+    if(Array.isArray(TD.layout.boardOrder))TD.layout.boardOrder=TD.layout.boardOrder.map(b=>b===old.name?name:b);
+    layoutChanged=true;
+  }
+  if(p.color!==old.color){(TD.layout.colors=TD.layout.colors||{})[name]=p.color;layoutChanged=true}
+  const oldIds=(old.sections||[]).map(x=>x.id),newSecs=p.sections||[];
+  newSecs.forEach(x=>{
+    if(!oldIds.includes(x.id)){const r=P.listCommands('add',TD.structs[0],tdUuid,{board:name,title:x.name});if(r.refused.length)toast(refusedMsg(r.refused[0])+(r.suggestion?' Try “'+r.suggestion+'”.':''));add(0,r.commands);return}
+    const o=old.sections.find(y=>y.id===x.id);
+    if(o.name!==x.name){const ai=accOfKey(x.id),r=P.listCommands('rename',TD.structs[ai],tdUuid,{key:listOfKey(x.id),title:x.name,board:name});if(r.refused.length)toast(refusedMsg(r.refused[0])+(r.suggestion?' Try “'+r.suggestion+'”.':''));add(ai,r.commands)}
+  });
+  oldIds.filter(x=>!newSecs.some(y=>y.id===x)).forEach(x=>{
+    const ai=accOfKey(x),lk=listOfKey(x),l=TD.structs[ai]&&TD.structs[ai].listsByKey.get(lk);
+    if(!l||!l.sectionId){toast(refusedMsg('not-a-section'));return}
+    // keep the tasks: move them out of the list first, then delete the list
+    const moves=[];TD.accounts[ai].raw.items.forEach(t=>{if(t.section_id===l.sectionId&&!t.parent_id)moves.push({type:'item_move',uuid:tdUuid(),args:{id:t.id,project_id:l.projectId}})});
+    add(ai,moves.concat([{type:'section_delete',uuid:tdUuid(),args:{id:l.sectionId}}]));
+  });
+  const kept=newSecs.map(x=>x.id).filter(x=>oldIds.includes(x)),was=oldIds.filter(x=>kept.includes(x));
+  if(JSON.stringify(kept)!==JSON.stringify(was)){(TD.layout.listOrder=TD.layout.listOrder||{})[name]=newSecs.map(x=>x.id);layoutChanged=true}
+  if(layoutChanged)tdSaveLayout();
+  items.set(id,Object.assign({},p,{name:name}));touch();
+  if(name!==old.name){st.proj='b:'+name;saveUi()}
+  render();
+  cmds.forEach((c,ai)=>tdSend(ai,c));
+}
+function tdDelBoard(id){
+  const b=items.get(id);if(!b)return;
+  if((b.sections||[]).length){toast('Delete or move this board’s lists first.');render();return}
+  TD.layout.boards=(TD.layout.boards||[]).filter(x=>x!==b.name);tdSaveLayout();
+  items.delete(id);touch();st.proj='@today';saveUi();render();
+}
+// Entry points used by put() and del() while connected to Todoist
+function tdPut(id,obj){
+  const k=obj&&obj.kind;
+  if(k==='task'){items.set(id,obj);touch();render();tdMarkDirty(id);return}
+  if(k==='session'){
+    const tid=obj.taskId;sessionsOf(tid).forEach(e=>{if(e[0]!=='s:'+tid)items.delete(e[0])});
+    items.set('s:'+tid,obj);touch();render();tdMarkDirty(tid);return;
+  }
+  if(k==='project'){tdPutBoard(id,obj);return}
+  if(k==='prefs'){items.set(id,obj);touch();render();tdSaveSetting('Sorting',obj.sort||{});return}
+  if(k==='zone'||k==='rule'||k==='zonegrid'){items.set(id,obj);touch();render();tdSaveKind(k);return}
+  toast('That can’t be saved to Todoist.');render();
+}
+function tdDel(id){
+  const it=items.get(id);if(!it){render();return}
+  if(it.kind==='task'){items.delete(id);items.delete('s:'+id);touch();render();tdMarkDirty(id);return}
+  if(it.kind==='session'){items.delete(id);touch();render();tdMarkDirty(it.taskId);return}
+  if(it.kind==='project'){tdDelBoard(id);return}
+  if(it.kind==='zone'||it.kind==='rule'){items.delete(id);touch();render();tdSaveKind(it.kind);return}
+  toast('That can’t be removed from Todoist here.');render();
+}
+// Completing: Todoist itself moves a repeating task to its next date.
+function tdComplete(id){
+  const t=items.get(id),ai=tdAccOfTask(id,t),acc=TD.accounts[ai],r=acc&&acc.raw.items.get(id);
+  if(!r){items.set(id,Object.assign({},t,{done:true}));touch();render();tdMarkDirty(id);return}
+  const recurring=!!(r.due&&r.due.is_recurring);
+  if(!recurring){items.set(id,Object.assign({},t,{done:true}));touch();render()}
+  tdSend(ai,[{type:'item_close',uuid:tdUuid(),args:{id:id}}]);
+  toast(recurring?'Done. Todoist moves it to its next date.':'Done.');
+}
+
 function tdRun(){
   TD.on=true;$('#m-sync').hidden=false;
-  clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
+  clearInterval(TD.timer);
+  TD.timer=setInterval(()=>{if(TD.queue.length){tdFlushQueue();return}if(!document.hidden&&!TD.dirty.size)tdSync(false).catch(()=>{})},60000);
 }
 async function tdStart(){
   TD.on=true;loaded=false;items=new Map();touch();render();tdRun();
   await tdSync(true).catch(()=>{});loaded=true;render();
+  tdLoadQueue();if(TD.queue.length)tdFlushQueue();
 }
-document.addEventListener('visibilitychange',()=>{if(TD.on&&!document.hidden&&Date.now()-TD.lastOk>15000)tdSync(false).catch(()=>{})});
+document.addEventListener('visibilitychange',()=>{if(TD.on&&!document.hidden){if(TD.queue.length)tdFlushQueue();else if(Date.now()-TD.lastOk>15000)tdSync(false).catch(()=>{})}});
 // Adds an account after checking its token. Returns an error message or ''.
 async function tdAddAccount(label,tok){
   if(!tok)return 'Paste a Todoist API token first.';
@@ -727,7 +925,8 @@ function renderStrip(){
     });
     if(TD.buildError)parts.push('Your Todoist loaded, but Pool & Plan couldn\u2019t lay it out: '+TD.buildError+'. Please send this message to get it fixed.');
     if(TD.renderError)parts.push('Something went wrong drawing the page: '+TD.renderError+'. Please send this message to get it fixed.');
-    if(loaded)parts.push('Read-only preview of your Todoist: look around freely, nothing is saved back yet.'+(TD.lastOk?' Last synced '+hm(new Date(TD.lastOk).getHours()*60+new Date(TD.lastOk).getMinutes())+'.':''));
+    const n=TD.queue.reduce((x,j)=>x+j.cmds.length,0);
+    if(n)parts.push(n+(n===1?' change':' changes')+' waiting to reach Todoist'+(TD.sendError==='offline'?': Todoist can\u2019t be reached, trying again every minute.':TD.sendError==='busy'?': Todoist asked to slow down, trying again in a minute.':TD.sendError==='auth'?': Todoist didn\u2019t accept the token. Open the logo menu \u2192 Accounts to replace it.':'\u2026'));
     s.hidden=!parts.length;s.innerHTML=parts.map(p=>'<span>'+esc(p)+'</span>').join('');return;
   }
   if(!loaded)parts.push('Loading your planner…');
@@ -741,8 +940,10 @@ function renderRail(){
   if(st.proj==='*'||(!special()&&st.proj!==''&&!items.has(st.proj)&&loaded))st.proj='@today';
   const ps=$('#proj-sel');
   if(document.activeElement!==ps){
-    ps.innerHTML='<option value="@today">Today</option><option value="@days">Upcoming</option><option value="">Inbox</option>'+projs.map(([id,p])=>'<option value="'+id+'">'+esc(p.name)+'</option>').join('')+'<option value="@periodic">Periodic</option><option value="@labels">By labels</option>';
+    ps.innerHTML='<option value="@today">Today</option><option value="@days">Upcoming</option>'+projs.map(([id,p])=>'<option class="bd p'+(p.color||0)+'" value="'+esc(id)+'">'+esc(p.name)+'</option>').join('')+
+      '<option disabled>\u2500\u2500\u2500\u2500\u2500\u2500</option><option class="vis" value="@periodic">Periodic</option><option class="vis" value="@labels">By labels</option><option value="">Inbox</option>';
     ps.value=st.proj;
+    const cur=items.get(st.proj);ps.className='sm'+(cur&&cur.kind==='project'?' bd p'+(cur.color||0):special()&&/@periodic|@labels/.test(st.proj)?' vis':'');
   }
   const so=$('#sort-sel');if(document.activeElement!==so)so.innerHTML='<option value="" selected disabled hidden>Sorting</option>'+[['manual','Manual order'],['primanual','Priority + manual'],['timepri','Time + priority + manual'],['priority','By priority']].map(o=>'<option value="'+o[0]+'">'+(st.sort===o[0]?'\u2713 ':'')+o[1]+'</option>').join('');
   $('#flt-unsched').checked=st.unsched;$('#flt-done').checked=st.showDone;
@@ -760,7 +961,7 @@ function lanesDef(){
   if(st.proj==='')return [{id:'',name:'Inbox',type:'sec'}];
   const p=items.get(st.proj);if(!p)return [];
   const secs=p.sections||[];
-  return [{id:'',name:secs.length?'No list':p.name,type:'sec',optional:secs.length>0}].concat(secs.map(s=>({id:s.id,name:s.name,type:'sec',edit:true})));
+  return [{id:'',name:secs.length?'No list':p.name,type:'sec',optional:secs.length>0}].concat(secs.map(s=>({id:s.id,name:s.name,tag:s.tag||'',type:'sec',edit:true})));
 }
 function cardHtml(id,t,all){
   const p=projOf(t),up=upcoming(id),done=isDone(t),pr=t.priority||4,today=tdy();
@@ -820,7 +1021,7 @@ function renderBoard(){
   let html=lanesDef().map(l=>{
     const list=laneTasks(l,all);
     if(l.optional&&!list.length)return '';
-    return '<div class="lane'+(l.id===tdy()?' is-today':'')+'" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'"><div class="lane-h'+(l.edit?' mv':'')+'">'+(l.type==='proj'&&l.id?'<span class="dot p'+l.color+'"></span>':'')+'<b>'+esc(l.name)+'</b><i>'+list.length+'</i>'+
+    return '<div class="lane'+(l.id===tdy()?' is-today':'')+'" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'"><div class="lane-h'+(l.edit?' mv':'')+'">'+(l.type==='proj'&&l.id?'<span class="dot p'+l.color+'"></span>':'')+'<b>'+esc(l.name)+'</b>'+(l.tag?'<span class="ltag">'+esc(l.tag)+'</span>':'')+'<i>'+list.length+'</i>'+
       (l.edit?'<button class="mini" data-act="editSection" data-id="'+l.id+'">Edit</button>':'')+(l.type==='proj'&&l.id?'<button class="mini" data-act="editList" data-id="'+l.id+'">Edit</button>':'')+'</div>'+
       list.map(([id,t])=>cardHtml(id,t,all)).join('')+
       (l.id==='late'||l.id==='later'||st.proj==='@periodic'?'':st.addIn===l.type+'|'+l.id?'<form class="lane-add" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'" novalidate><input type="text" id="lane-add-input" placeholder="New task, Enter to add" aria-label="New task in this list" autocomplete="off"></form>':'<button class="plus" data-act="laneAdd" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'" aria-label="Add a task to this list" title="Add a task">+</button>')+'</div>';
@@ -859,7 +1060,7 @@ function renderCal(){
   const cal=$('#cal'),keepT=cal.scrollTop,keepL=cal.scrollLeft;
   if(st.span==='month'){renderMonth(cal);cal.scrollTop=keepT;return}
   const days=visDays(),today=tdy(),wide=days.length>1;
-  const cols='grid-template-columns:52px repeat('+days.length+',minmax('+(wide?'64px':'0')+',1fr))';
+  const cols='grid-template-columns:52px repeat('+days.length+',minmax('+(wide?'64px':'0')+',260px))';
   const keys=days.map(ymd);
   const events=byKind('event'),sessions=byKind('session'),bands=byKind('band');
   const head='<div class="gut"></div>'+days.map((d,i)=>'<div class="dh'+(keys[i]===today?' today':'')+'"><span class="dn">'+DN[wd(d)]+'</span><span class="dd">'+d.getDate()+'</span></div>').join('');
@@ -947,6 +1148,7 @@ function addSession(taskId,date,start,dur,repeat,remind){
 }
 function completeTask(id,depth){
   const t=items.get(id);if(!t)return;
+  if(TD.on){tdComplete(id);if(!depth)fire('completed',id,1);return}
   const nb=t.recur?null:nextBlock(id);
   if(nb&&nb.ses.repeat){
     put(nb.sid,Object.assign({},nb.ses,{doneDates:(nb.ses.doneDates||[]).concat([nb.k])}));
@@ -957,6 +1159,7 @@ function completeTask(id,depth){
   if(!depth)fire('completed',id,1);
 }
 function delTask(id){
+  if(TD.on){del(id);return}   // Todoist deletes subtasks and the time block with the task
   byKind('task').forEach(e=>{if(e[1].parentId===id)delTask(e[0])});
   sessionsOf(id).forEach(e=>del(e[0]));del(id);
 }
@@ -978,7 +1181,6 @@ function fire(ev,id,depth){
   if(complete&&!depth&&!isDone(n))completeTask(id,1);
 }
 function runTimeRules(){
-  if(TD.on)return;
   if(timeRulesRan)return;timeRulesRan=true;const t=tdy();
   byKind('task').forEach(([id,x])=>{if(isDone(x))return;const nb=nextBlock(id),k=x.day||(nb&&nb.k)||x.deadline||'';if((k&&k<t)||missedBlock(id))fire('overdue',id);else if(k===t)fire('dueToday',id)});
 }
@@ -1398,7 +1600,7 @@ const ACT={
     tdBuild();openAccounts();
   },
   editSection:(b,id)=>openSection(id),
-  delSection:(b,id)=>{const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
+  delSection:(b,id)=>{if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Confirm: delete list (tasks are kept)';return}const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
   cancel:()=>dlg.close(),
   lblDel:(b,id)=>{const h=$('#f-labels');if(h){h.value=lblCur().filter(x=>x!==id).join(' ');labelBox()}},
   laneAdd:b=>{st.addIn=b.dataset.ltype+'|'+b.dataset.lane;renderBoard();const i=$('#lane-add-input');if(i)i.focus()},
@@ -1413,6 +1615,7 @@ const ACT={
   },
   toggleSes:(b,id)=>{
     const s=items.get(id);if(!s)return;const k=b.dataset.date,was=sesDone(s,k);
+    if(TD.on){if(!was)completeTask(s.taskId);return}
     if(s.repeat){const dd=(s.doneDates||[]).filter(x=>x!==k);if(!was)dd.push(k);put(id,Object.assign({},s,{doneDates:dd}))}
     else put(id,Object.assign({},s,{done:!was}));
     if(!was)fire('sessionDone',s.taskId);

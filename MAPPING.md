@@ -8,7 +8,7 @@ How Pool & Plan reads and writes Todoist. Todoist is the only place data is stor
 |---|---|
 | Project **POOL**, section `ADMIN Tasks` | Board **ADMIN**, list **Tasks** |
 | Project **MUSIC** (overflow of POOL), section `MUSIC Albums` | Board **MUSIC**, list **Albums** (same rule as POOL) |
-| Project named `BOARD_Name`, e.g. `ADMIN_LCDLS` | Board **ADMIN**, list **LCDLS**, marked *restricted editing* |
+| Project named `BOARD_Name`, e.g. `ADMIN_Example` | Board **ADMIN**, list **LCDLS**, marked *restricted editing* |
 | **Inbox** project | Inbox view |
 | Task in POOL or MUSIC with no section | Inbox view |
 | Section `NOTES Config` | Pool & Plan's settings (hidden from all views) |
@@ -26,7 +26,7 @@ How Pool & Plan reads and writes Todoist. Todoist is the only place data is stor
 
 ### Restricted lists (`BOARD_Name` projects)
 
-These projects belong to another system (ADMIN_LCDLS is synced with Notion by a separate routine).
+These projects belong to another system (ADMIN_Example is synced with Notion by a separate routine).
 
 - Shown with a *restricted editing* marker.
 - Tasks inside can be edited and completed as usual; the Notion routine carries the change over.
