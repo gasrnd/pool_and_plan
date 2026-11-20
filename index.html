@@ -132,6 +132,9 @@ a.lk:hover{text-decoration-thickness:2px}
 .tk{flex:none;width:17px;height:17px;padding:0;border-radius:50%;border:1.5px solid var(--prc,var(--mute));background:var(--surface);font-size:11px;line-height:1;color:var(--ink);margin-top:1px}
 .pr1{--prc:var(--pri1)}.pr2{--prc:var(--pri2)}.pr3{--prc:var(--pri3)}
 .tk.pr1,.tk.pr2,.tk.pr3{border-width:2px;background:color-mix(in srgb,var(--prc) 16%,var(--surface))}
+.mi.subt{border:1px solid var(--line);background:transparent;border-radius:999px;padding:0 7px;font-size:11px;color:inherit;cursor:pointer}
+.mi.subt:hover{border-color:var(--mute)}
+.mi.subt .car{font-size:9px;margin-left:2px}
 .subs{display:flex;flex-direction:column;gap:3px;margin-top:5px;padding-left:24px}
 .sub{display:flex;gap:6px;align-items:flex-start;font-size:12px;cursor:pointer}
 .sub .tk{width:14px;height:14px;font-size:9px}
@@ -417,6 +420,7 @@ const seen=lsGet('poolplan.alerted')||{};
 const alerted=new Set(seen.day===tdy()?seen.keys:[]);
 
 const byOrder=(a,b)=>((a[1].order||9e15)-(b[1].order||9e15))||a[1].name.localeCompare(b[1].name);
+const openSubs=new Set(lsGet('poolplan.opensubs')||[]);
 let itemsVer=0,kc={ver:-1,map:null,ses:null};
 const touch=()=>{itemsVer++};
 function kcFresh(){if(kc.ver!==itemsVer||!kc.map){kc={ver:itemsVer,map:new Map(),ses:null}}return kc}
@@ -773,7 +777,8 @@ function cardHtml(id,t,all){
   if(t.day&&!whenShown)mi(done?'':dateClass(t.day),'cal',dateName(t.day));
   if(t.deadline)mi(!done&&t.deadline<=today?'c-late':'','flag',dayLabel(t.deadline));
   if(t.recur&&!(up.length&&!done&&up.some(e=>e[1].repeat)))mi('c-rec','rep','');
-  if(subs.length)mi('','sub',subs.filter(e=>isDone(e[1])).length+'/'+subs.length);
+  const subOpen=openSubs.has(id);
+  if(subs.length)m.push('<button type="button" class="mi subt" data-act="toggleSubs" data-id="'+id+'" aria-expanded="'+subOpen+'" title="'+(subOpen?'Hide':'Show')+' subtasks">'+ic('sub')+subs.filter(e=>isDone(e[1])).length+'/'+subs.length+'<span class="car">'+(subOpen?'\u25be':'\u25b8')+'</span></button>');
   if(t.notes)mi('','note','');
   (t.labels||[]).forEach(l=>mi('c-lab','tag',l));
   if(special()&&p){const s=(p.sections||[]).find(x=>x.id===t.sectionId);m.push('<span class="mi"><span class="dot p'+(p.color||0)+'"></span>'+esc(p.name+(s?' / '+s.name:''))+'</span>')}
@@ -781,7 +786,7 @@ function cardHtml(id,t,all){
     '<button class="tk pr'+pr+'" data-act="toggleTask" data-id="'+id+'" aria-label="Complete task">'+(done?'✓':'')+'</button>'+
     '<div class="card-t">'+fmt(t.title,true)+'</div></div>'+
     (m.length?'<div class="card-m">'+m.join('')+'</div>':'')+
-    (subs.length?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
+    (subs.length&&subOpen?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
 }
 function inLane(l,id,t){
   if(l.type==='proj')return pidOf(t)===l.id&&(st.proj!=='@periodic'||!!t.recur||sessionsOf(id).some(e=>e[1].repeat));
@@ -1371,6 +1376,7 @@ const ACT={
   newSection:()=>openProject(null),
   tdSyncNow:()=>{if(TD.on)tdSync(false).then(()=>toast('Synced with Todoist.')).catch(()=>{})},
   tdAccounts:()=>openAccounts(),
+  toggleSubs:(b,id)=>{if(openSubs.has(id))openSubs.delete(id);else openSubs.add(id);lsSet('poolplan.opensubs',[...openSubs]);renderBoard()},
   tdMain:(b,id)=>{
     const i=+id;if(!(i>0)||!TD.accounts[i])return;
     const [a]=TD.accounts.splice(i,1);TD.accounts.unshift(a);tdSave();tdBuild();
