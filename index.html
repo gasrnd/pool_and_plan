@@ -567,11 +567,11 @@ function openAccounts(){
   if(!window.PPMap){openDlg('Accounts','<div class="hint">Todoist accounts can be connected on the website version of Pool &amp; Plan.</div>',null);return}
   const status=a=>a.error==='auth'?'token not accepted':a.error?'not reachable':a.lastOk?'synced '+hm(new Date(a.lastOk).getHours()*60+new Date(a.lastOk).getMinutes()):'not synced yet';
   const rows=TD.accounts.map((a,i)=>'<div class="acc"><div class="li"><span><b>'+esc(accName(a))+'</b>'+(a.label&&a.email?' · '+esc(a.email):'')+(i===0?' · main':'')+' · '+status(a)+(a.lastOk?' · '+a.raw.projects.size+' projects, '+a.raw.sections.size+' sections, '+a.raw.items.size+' tasks loaded':'')+'</span>'+
-    '<button type="button" data-act="tdRetoken" data-id="'+i+'">Replace token</button><button type="button" data-act="tdRemove" data-id="'+i+'">Remove</button></div>'+
+    (i>0?'<button type="button" data-act="tdMain" data-id="'+i+'">Make main</button>':'')+'<button type="button" data-act="tdRetoken" data-id="'+i+'">Replace token</button><button type="button" data-act="tdRemove" data-id="'+i+'">Remove</button></div>'+
     '<div class="row acc-new" id="acc-new-'+i+'" hidden><input type="text" name="username" autocomplete="username" value="'+esc(accName(a))+'" hidden aria-hidden="true" tabindex="-1">'+
     '<input type="password" id="acc-tok-'+i+'" autocomplete="current-password" placeholder="New Todoist API token" aria-label="New token for '+esc(accName(a))+'">'+
     '<button type="button" data-act="tdRetokenSave" data-id="'+i+'">Save token</button></div></div>').join('');
-  const body='<div class="hint">The first account is the main one: its Inbox and its NOTES Config settings are used. Boards with the same name are shown together; each list stays in its own account.</div>'+
+  const body='<div class="hint">The main account\u2019s Inbox and NOTES Config settings are used; the others contribute their lists. Boards with the same name are shown together; each list stays in its own account.</div>'+
     '<div class="list">'+(rows||'<div class="hint">No accounts connected.</div>')+'</div><div class="hint" id="f-accmsg"></div><h3>Add an account</h3>'+
     '<input type="text" id="f-accname" name="username" autocomplete="username" placeholder="Account name, e.g. gas_rnd" aria-label="Account name">'+
     '<input type="password" id="f-acctoken" name="password" autocomplete="current-password" placeholder="Todoist API token" aria-label="Todoist API token">'+
@@ -1371,6 +1371,11 @@ const ACT={
   newSection:()=>openProject(null),
   tdSyncNow:()=>{if(TD.on)tdSync(false).then(()=>toast('Synced with Todoist.')).catch(()=>{})},
   tdAccounts:()=>openAccounts(),
+  tdMain:(b,id)=>{
+    const i=+id;if(!(i>0)||!TD.accounts[i])return;
+    const [a]=TD.accounts.splice(i,1);TD.accounts.unshift(a);tdSave();tdBuild();
+    toast(accName(a)+' is now the main account.');openAccounts();
+  },
   tdRetoken:(b,id)=>{const r=$('#acc-new-'+id);if(!r)return;r.hidden=!r.hidden;if(!r.hidden){const i=$('#acc-tok-'+id);if(i)i.focus()}},
   tdRetokenSave:(b,id)=>{
     const i=$('#acc-tok-'+id);b.disabled=true;b.textContent='Checking\u2026';
