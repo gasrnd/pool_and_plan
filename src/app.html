@@ -342,7 +342,12 @@ function fmt(raw,linkable){
   const codes=[];let h=esc(raw).replace(/`([^`]+)`/g,(m,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000'});
   const short=u=>u.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'').slice(0,40)+(u.replace(/^https?:\/\/(www\.)?/,'').length>40?'…':'');
   const link=(u,t)=>linkable?'<a class="lk" href="'+u+'" target="_blank" rel="noopener">'+t+'</a>':'<span class="lk">'+t+'</span>';
-  h=h.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,t,u)=>link(u,t));
+  // [text](target): any target. No scheme means a web address; scripts and data URLs are refused.
+  h=h.replace(/\[([^\]]+)\]\(\s*([^\s)]+)\s*\)/g,(m,t,u)=>{
+    const scheme=/^([a-z][a-z0-9+.-]*):/i.exec(u);
+    if(scheme&&/^(javascript|data|vbscript|file)$/i.test(scheme[1]))return t;
+    return link(scheme?u:'https://'+u.replace(/^\/\//,''),t);
+  });
   h=h.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g,(m,pre,u)=>pre+link(u,short(u)));
   h=h.replace(/(^|[^\w_])__([^_].*?[^_]|[^_])__(?![\w_])/g,'$1<u>$2</u>');
   h=h.replace(/\*\*([^*]+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\s](?:[^*]*?[^*\s])?)\*(?![*\w])/g,'$1<i>$2</i>').replace(/~~([^~]+?)~~/g,'<s>$1</s>');
