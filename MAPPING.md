@@ -1,0 +1,93 @@
+# Pool & Plan ↔ Todoist mapping
+
+How Pool & Plan reads and writes Todoist. Todoist is the only place data is stored; the website reads it in your browser and sends every edit back.
+
+## Structure
+
+| Todoist | Pool & Plan |
+|---|---|
+| Project **POOL**, section `ADMIN Tasks` | Board **ADMIN**, list **Tasks** |
+| Project **MUSIC** (overflow of POOL), section `MUSIC Albums` | Board **MUSIC**, list **Albums** (same rule as POOL) |
+| Project named `BOARD_Name`, e.g. `ADMIN_LCDLS` | Board **ADMIN**, list **LCDLS**, marked *restricted editing* |
+| **Inbox** project | Inbox view |
+| Task in POOL or MUSIC with no section | Inbox view |
+| Section `NOTES Config` | Pool & Plan's settings (hidden from all views) |
+| Any other project | Its own board, named after the project; its sections are its lists |
+
+### Section names: `BOARD List title`
+
+- The leading words written **entirely in capitals** are the board; the rest is the list title.
+  - `ADMIN Tasks` → board ADMIN, list "Tasks"
+  - `SELF GROWING Reading` → board SELF GROWING, list "Reading"
+  - `ADMIN Buy & Sell` → board ADMIN, list "Buy & Sell"
+- A list title is never all capitals beyond its first letter. `ADMIN PROJECTS` would read as a board called "ADMIN PROJECTS" with no list, so the planner asks for a title like `ADMIN Projects`.
+- A section in POOL or MUSIC without a capitalised board word goes to an **Unsorted** board, so it is never hidden.
+- Boards are shown in the order they first appear in POOL, unless the settings say otherwise. Lists keep Todoist's section order.
+
+### Restricted lists (`BOARD_Name` projects)
+
+These projects belong to another system (ADMIN_LCDLS is synced with Notion by a separate routine).
+
+- Shown with a *restricted editing* marker.
+- Tasks inside can be edited and completed as usual; the Notion routine carries the change over.
+- Tasks cannot be dragged into or out of the list, because that would move them between Todoist projects and break the Notion sync.
+
+## Tasks
+
+| Todoist field | Pool & Plan |
+|---|---|
+| `content` | Task name |
+| `description` | Notes |
+| `priority` 4 / 3 / 2 / 1 | P1 / P2 / P3 / P4 (Todoist stores P1 as 4) |
+| `labels` | Labels |
+| `parent_id` | Subtask of |
+| `child_order` | Manual order |
+| `checked` | Done |
+| `deadline` | Shown as a flag, read-only |
+| `due` = `YYYY-MM-DD` | Date, no time (all-day) |
+| `due` = `YYYY-MM-DDTHH:MM:SS` | Date and time = a time block |
+| `duration` (minutes) | Block length |
+| `due` = `YYYY-MM-DD` + `duration` (days) | Multi-day task without a time, from the due date over that many days |
+| `due.is_recurring` + `due.string` | Repeat |
+
+- **Fixed events are ordinary tasks.** There is no separate event type.
+- **A block without a duration** in Todoist is shown as 60 minutes, but no duration is written back unless you change it.
+- **Several blocks for one task** are made as subtasks, each with its own date and time.
+- **Multi-day tasks without a time** (a trip, a 3-day workshop) use Todoist's due date as the first day and a duration in days. Todoist stores this faithfully, but its own apps don't display day durations, so in Todoist the task looks like a one-day task on its first day. In Pool & Plan it spans every day, in the all-day row and in Today and Upcoming.
+- **Times are floating** (no timezone), i.e. in your local time, as Todoist does by default.
+
+### Repeats
+
+Pool & Plan understands these Todoist repeat phrases (English) and can edit them:
+
+`every day`, `every 3 days`, `every weekday` / `every workday`, `every week`, `every 2 weeks`, `every mon, wed, fri`, `every monday`, `every month`, `every 2 months`, `every 15th` — each optionally followed by `at 07:00`.
+
+Anything else (`every 3rd friday`, `every other …`, phrases in another language) is kept exactly as written: the planner shows the next date and the repeat icon, lets you tick it off, but leaves the date and repeat to be edited in Todoist.
+
+Completing a repeating task in Pool & Plan completes that occurrence, exactly like ticking it in Todoist.
+
+## Settings (`NOTES Config`)
+
+One task per setting. The task name is the setting; its description holds the data as JSON.
+
+| Task name | Holds |
+|---|---|
+| `Zones` | Zone names and colours |
+| `Zone grid` | Which zone each half hour of the week belongs to |
+| `Rules` | Automation rules |
+| `Sorting` | Sorting chosen for each board |
+| `Layout` | Board order and colours |
+
+These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but is not needed.
+
+## Syncing
+
+- On opening, the planner loads everything once, then asks Todoist only for changes: every minute, and whenever the tab comes back into focus.
+- Every edit is sent straight away. If the connection drops, edits wait in a queue and are sent when it returns.
+- If the same task changes in two places between checks, the last change to reach Todoist wins.
+- Todoist allows 1,000 change checks and 100 full loads per 15 minutes per user; one check a minute stays far below that.
+
+## Limits, on purpose
+
+- The website stores nothing on a server. Your Todoist token stays in the browser of each device you connect.
+- Nothing about Notion is handled here; the separate routine keeps Notion and Todoist in step.

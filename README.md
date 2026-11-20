@@ -14,4 +14,4 @@ The whole app is the single file `index.html`. Open it in a browser, or serve th
 ## Where data lives
 
 For now, everything is saved in the browser of the device you use (local storage), so each device has its own copy.
-Syncing tasks with Todoist is the planned next step.
+Syncing with Todoist is being built. How every project, section and task maps between Todoist and Pool & Plan is described in [MAPPING.md](MAPPING.md); the code is in `todoist-mapping.js`, tested with `node test/mapping.test.js`.
