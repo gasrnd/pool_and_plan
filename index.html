@@ -226,6 +226,18 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .hint{color:var(--mute);font-size:12px}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:999px;z-index:60;max-width:calc(100vw - 32px)}
 
+.connect{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto}
+.cbox{width:min(440px,100%);display:flex;flex-direction:column;gap:12px}
+.cbox h1{font-family:var(--f-display);font-size:26px;margin:0}
+.cbox h1 span{color:var(--accent)}
+.cbox p,.cbox ol{margin:0;color:var(--mute);line-height:1.5}
+.cbox ol{padding-left:20px}
+.cbox a{color:var(--accent)}
+.cbox form{display:flex;gap:8px}
+.cbox input{flex:1}
+.cerr{color:var(--now)!important}
+.menu .pop button[hidden]{display:none}
 @media (max-width:560px){
   #main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,2fr) minmax(0,3fr)}
   #main.board{grid-template-rows:minmax(0,1fr)}
@@ -234,6 +246,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+<script src="todoist-mapping.js"></script>
 </head>
 <body>
 
@@ -268,7 +281,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
-      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button></div></details>
+      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button><button type="button" data-act="tdDisconnect" id="m-disconnect" hidden>Disconnect Todoist</button></div></details>
       <select id="sort-sel" class="sm" aria-label="Sorting"></select>
       <label class="chk sm"><input type="checkbox" id="flt-unsched"> No date</label>
       <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label>
@@ -278,6 +291,22 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="cal" aria-label="Calendar"></section>
   <section id="zones" aria-label="Weekly zones"></section>
 </main>
+<div class="connect" id="connect" hidden>
+  <div class="cbox">
+    <h1>Pool <span>&amp;</span> Plan</h1>
+    <p>Connect your Todoist account to see your tasks here.</p>
+    <ol>
+      <li>Open <a href="https://app.todoist.com/app/settings/integrations/developer" target="_blank" rel="noopener">Todoist settings → Integrations → Developer</a>.</li>
+      <li>Copy your API token and paste it below.</li>
+    </ol>
+    <form id="cform" novalidate>
+      <input type="password" id="ctoken" placeholder="Todoist API token" aria-label="Todoist API token" autocomplete="off">
+      <button class="pri" id="cbtn">Connect</button>
+    </form>
+    <p class="cerr" id="cerr" hidden></p>
+    <p>The token is kept in this browser only. Anyone who has it can read and change your Todoist, so don't share it.</p>
+  </div>
+</div>
 <dialog id="dlg"><form id="dform" novalidate></form></dialog>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -343,10 +372,102 @@ function writeErr(e){
   else toast('That change could not be saved. Check your connection and try again.');
 }
 function chain(id,fn){const p=(queues.get(id)||Promise.resolve()).then(fn).catch(writeErr);queues.set(id,p)}
-function put(id,obj){items.set(id,obj);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).set(obj));render()}
-function del(id){items.delete(id);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).delete());render()}
+function put(id,obj){
+  if(TD.on){if(obj&&obj.kind==='prefs'){items.set(id,obj);render();return}tdReadOnly();render();return}
+  items.set(id,obj);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).set(obj));render()}
+function del(id){if(TD.on){tdReadOnly();render();return}items.delete(id);if(local)lsSet(LS,[...items]);else chain(id,()=>col.doc(id).delete());render()}
+
+/* ---------- Todoist (website only; read-only for now) ---------- */
+const TD={on:false,token:'',syncToken:'*',raw:{projects:new Map(),sections:new Map(),items:new Map()},S:null,busy:false,lastOk:0,error:'',timer:0,warned:0};
+const TDKEY='poolplan.todoist';
+function tdReadOnly(){const fresh=Date.now()-TD.warned>4000;TD.warned=Date.now();if(fresh){toast('Read-only for now: changes aren\u2019t saved to Todoist yet.')}}
+function showConnect(msg){
+  const c=$('#connect');c.hidden=false;const e=$('#cerr');e.hidden=!msg;e.textContent=msg||'';
+  setTimeout(()=>{const i=$('#ctoken');if(i)i.focus()},50);
+}
+async function tdFetch(full){
+  const body=new URLSearchParams({sync_token:full?'*':TD.syncToken,resource_types:JSON.stringify(['projects','sections','items'])});
+  let r;
+  try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+TD.token},body:body})}
+  catch(e){const er=new Error('offline');er.code='offline';throw er}
+  if(r.status===401||r.status===403){const er=new Error('auth');er.code='auth';throw er}
+  if(r.status===429){const er=new Error('busy');er.code='busy';throw er}
+  if(!r.ok){const er=new Error('http '+r.status);er.code='http';throw er}
+  return r.json();
+}
+function tdMerge(j){
+  if(j.full_sync){TD.raw.projects.clear();TD.raw.sections.clear();TD.raw.items.clear()}
+  [['projects','projects'],['sections','sections'],['items','items']].forEach(([k,m])=>{
+    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k==='projects'&&o.is_archived)||(k==='sections'&&o.is_archived))TD.raw[m].delete(o.id);else TD.raw[m].set(o.id,o)});
+  });
+  if(j.sync_token)TD.syncToken=j.sync_token;
+}
+async function tdSync(full){
+  if(TD.busy)return;TD.busy=true;
+  try{
+    const j=await tdFetch(full||!TD.lastOk);tdMerge(j);
+    TD.lastOk=Date.now();TD.error='';tdBuild();
+  }catch(e){
+    TD.error=e.code||'http';
+    if(e.code==='auth'){tdStop();try{localStorage.removeItem(TDKEY)}catch(x){}showConnect('Todoist didn\u2019t accept that token. Copy it again from Todoist and paste it here.');}
+    renderStrip();
+    throw e;
+  }finally{TD.busy=false}
+}
+function tdBuild(){
+  const P=window.PPMap,projects=[...TD.raw.projects.values()],sections=[...TD.raw.sections.values()],its=[...TD.raw.items.values()];
+  let S=P.buildStructure(projects,sections,null);
+  const set=P.readSettings(its,S),v=set.values;
+  if(v.Layout&&Array.isArray(v.Layout.boardOrder))S=P.buildStructure(projects,sections,v.Layout);
+  TD.S=S;TD.settings=set;
+  const m=new Map(),colors=(v.Layout&&v.Layout.colors)||{};
+  S.boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,
+    sections:b.lists.filter(l=>!l.root).map(l=>({id:l.key,name:l.restricted?l.title+' \u00b7 restricted':l.title}))}));
+  its.forEach(t=>{
+    const x=P.fromTodoist(t,S);if(x.view==='config'||x.view==='hidden')return;
+    const list=x.listKey?S.listsByKey.get(x.listKey):null;
+    const task={kind:'task',title:x.title,notes:x.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
+      projectId:list?'b:'+list.board:'',sectionId:list&&!list.root?list.key:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted};
+    if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;if(x.days>1)task.days=x.days}
+    else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
+    m.set(t.id,task);
+  });
+  (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
+  if(v['Zone grid'])m.set('zonegrid',{kind:'zonegrid',days:v['Zone grid']});
+  (Array.isArray(v.Rules)?v.Rules:[]).forEach((r,i)=>m.set(r.id||('r'+i),Object.assign({kind:'rule'},r)));
+  const prev=items.get('prefs');
+  m.set('prefs',prev||{kind:'prefs',sort:v.Sorting||{}});
+  items=m;loaded=true;render();
+}
+function tdStop(){TD.on=false;clearInterval(TD.timer);TD.timer=0}
+async function tdStart(){
+  TD.on=true;loaded=false;items=new Map();render();
+  $('#m-sync').hidden=false;$('#m-disconnect').hidden=false;
+  try{await tdSync(true)}catch(e){loaded=true;render();if(e.code==='auth')return}
+  clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
+}
+document.addEventListener('visibilitychange',()=>{if(TD.on&&!document.hidden&&Date.now()-TD.lastOk>15000)tdSync(false).catch(()=>{})});
+$('#cform').addEventListener('submit',async e=>{
+  e.preventDefault();const tok=$('#ctoken').value.trim();
+  if(!tok){showConnect('Paste your Todoist API token first.');return}
+  const b=$('#cbtn');b.disabled=true;b.textContent='Connecting\u2026';
+  TD.token=tok;
+  try{const j=await tdFetch(true);try{localStorage.setItem(TDKEY,tok)}catch(x){}
+    $('#connect').hidden=true;$('#ctoken').value='';TD.on=true;tdMerge(j);TD.lastOk=Date.now();tdBuild();
+    $('#m-sync').hidden=false;$('#m-disconnect').hidden=false;
+    clearInterval(TD.timer);TD.timer=setInterval(()=>{if(!document.hidden)tdSync(false).catch(()=>{})},60000);
+  }catch(x){
+    TD.token='';
+    showConnect(x.code==='auth'?'Todoist didn\u2019t accept that token. Check you copied all of it.':x.code==='offline'?'Todoist can\u2019t be reached. Check your connection and try again.':'Todoist answered with an error. Try again in a minute.');
+  }finally{b.disabled=false;b.textContent='Connect'}
+});
 
 async function initStore(){
+  if(window.PPMap){
+    let tok='';try{tok=localStorage.getItem(TDKEY)||''}catch(e){}
+    if(!tok){loaded=true;render();showConnect('');return}
+    TD.token=tok;return tdStart();
+  }
   let db=null;
   try{db=window.claude&&window.claude.use?await window.claude.use('db'):null}catch(e){}
   if(!db){
@@ -367,6 +488,7 @@ function occursOn(it,k){
   const r=it.repeat;
   if(!r)return it.allDay?(it.date<=k&&(it.end||it.date)>=k):it.date===k;
   if(k<it.date||(r.until&&k>r.until)||(it.skip||[]).includes(k))return false;
+  if(k===it.date)return true;
   const iv=r.interval||1,d=pdate(k);
   if(r.freq==='daily')return diffDays(it.date,k)%iv===0;
   if(r.freq==='weekdays')return wd(d)<5;
@@ -375,8 +497,14 @@ function occursOn(it,k){
     if(!days.includes(wd(d)))return false;
     return Math.floor(diffDays(ymd(monday(pdate(it.date))),k)/7)%iv===0;
   }
-  if(r.freq==='monthly'){const a=pdate(it.date);return a.getDate()===d.getDate()&&((d.getFullYear()-a.getFullYear())*12+d.getMonth()-a.getMonth())%iv===0}
-  return false;
+  if(r.freq==='monthly'){
+    const a=pdate(it.date);if(((d.getFullYear()-a.getFullYear())*12+d.getMonth()-a.getMonth())%iv!==0)return false;
+    if(r.nth){if(wd(d)!==r.weekday)return false;return r.nth===-1?addDays(d,7).getMonth()!==d.getMonth():Math.ceil(d.getDate()/7)===r.nth}
+    if(r.monthDay===-1)return addDays(d,1).getMonth()!==d.getMonth();
+    return (r.monthDay||a.getDate())===d.getDate();
+  }
+  if(r.freq==='yearly'){const a=pdate(it.date);return a.getDate()===d.getDate()&&a.getMonth()===d.getMonth()&&(d.getFullYear()-a.getFullYear())%iv===0}
+  return it.date===k;
 }
 function stepDate(k,r){
   const d=pdate(k),iv=r.interval||1;
@@ -389,6 +517,8 @@ function stepDate(k,r){
 }
 function repeatText(r){
   if(!r)return '';
+  if(r.freq==='custom')return r.text||'repeats';
+  if(r.nth||r.freq==='yearly'||r.monthDay)return window.PPMap?window.PPMap.repeatString(r):'repeats';
   const iv=r.interval||1;
   if(r.freq==='weekdays')return 'every weekday';
   if(r.freq==='weekly'){const base=iv>1?'every '+iv+' weeks':'every week';return r.days&&r.days.length?base+' on '+r.days.map(d=>DN[d]).join(' '):base}
@@ -407,6 +537,8 @@ const sesDone=(s,k)=>s.repeat?(s.doneDates||[]).includes(k):!!s.done;
 function sessionsOf(id){return byKind('session').filter(e=>e[1].taskId===id)}
 function upcoming(id){const t=tdy();return sessionsOf(id).filter(e=>{const s=e[1];return s.repeat?(!s.repeat.until||s.repeat.until>=t):(s.date>=t&&!s.done)})}
 
+const lastDay=t=>t.day?((t.days||1)>1?ymd(addDays(pdate(t.day),t.days-1)):t.day):'';
+const onDay=(t,k)=>!!t.day&&t.day<=k&&lastDay(t)>=k;
 function nextBlock(id){
   let best=null;
   upcoming(id).forEach(e=>{const s=e[1];let k=s.date;
@@ -442,6 +574,14 @@ function renderTop(){
 }
 function renderStrip(){
   const s=$('#strip'),parts=[];
+  if(TD.on||TD.token){
+    if(!loaded)parts.push('Loading from Todoist\u2026');
+    else if(TD.error==='offline')parts.push('Todoist can\u2019t be reached. Showing what was loaded last; trying again every minute.');
+    else if(TD.error==='busy')parts.push('Todoist asked to slow down. Trying again in a minute.');
+    else if(TD.error)parts.push('Todoist answered with an error. Trying again in a minute.');
+    if(loaded&&TD.on)parts.push('Read-only preview of your Todoist: look around freely, nothing is saved back yet.'+(TD.lastOk?' Last synced '+hm(new Date(TD.lastOk).getHours()*60+new Date(TD.lastOk).getMinutes())+'.':''));
+    s.hidden=!parts.length;s.innerHTML=parts.map(p=>'<span>'+esc(p)+'</span>').join('');return;
+  }
   if(!loaded)parts.push('Loading your planner…');
   if(note)parts.push(esc(note));
   if(readOnly)parts.push('Only the owner can see and change this planner.');
@@ -506,7 +646,7 @@ function inLane(l,id,t){
   const td=tdy();
   if(l.id==='late')return !isDone(t)&&((t.day&&t.day<td)||(t.deadline&&t.deadline<td)||!!missedBlock(id));
   if(l.id==='later')return (t.day&&t.day>l.after)||(t.deadline&&t.deadline>l.after)||sessionsOf(id).some(e=>!e[1].repeat&&e[1].date>l.after);
-  return t.day===l.id||t.deadline===l.id||sessionsOf(id).some(e=>occursOn(e[1],l.id));
+  return onDay(t,l.id)||t.deadline===l.id||sessionsOf(id).some(e=>occursOn(e[1],l.id));
 }
 function whenKey(id,t){
   const nb=nextBlock(id),best=nb?nb.k+'T'+hm(nb.s):'',d=t.day?t.day+'T99':'';
@@ -582,7 +722,11 @@ function renderCal(){
     const a=Math.max(0,diffDays(keys[0],e.date)),b=Math.min(days.length-1,diffDays(keys[0],e.end||e.date));
     ad+='<div class="chip ev" data-id="'+id+'" data-date="'+e.date+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+esc(e.title)+'</div>';
   });
-  byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.day);if(i>=0&&!isDone(t)&&!(t.parentId&&items.has(t.parentId))&&!sessions.some(e=>e[1].taskId===id&&occursOn(e[1],t.day))){const p=projOf(t);ad+='<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">'+esc(t.title)+'</div>'}});
+  byKind('task').forEach(([id,t])=>{
+    if(!t.day||isDone(t)||(t.parentId&&items.has(t.parentId))||t.day>keys[keys.length-1]||lastDay(t)<keys[0])return;
+    if(sessions.some(e=>e[1].taskId===id&&occursOn(e[1],t.day)))return;
+    const a=Math.max(0,diffDays(keys[0],t.day)),b=Math.min(keys.length-1,diffDays(keys[0],lastDay(t))),p=projOf(t);
+    ad+='<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+esc(t.title)+((t.days||1)>1?' \u00b7 '+t.days+' days':'')+'</div>'});
   byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.deadline);if(i>=0&&!isDone(t))ad+='<div class="chip dl" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">Due: '+esc(t.title)+'</div>'});
   let gut='';for(let h=7;h<23;h++)gut+='<span style="top:'+((h-6)*H)+'px">'+pad(h)+':00</span>';
   const body=days.map((d,di)=>{
@@ -607,7 +751,7 @@ function renderMonth(cal){
     const d=addDays(start,i),k=ymd(d),chips=[];
     events.forEach(([id,e])=>{if(occursOn(e,k))chips.push({s:e.allDay?-1:e.start,h:'<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+(e.allDay?'':hm(e.start)+' ')+esc(e.title)+'</div>'})});
     sessions.forEach(([id,s])=>{if(occursOn(s,k)){const n=sesInfo(s,k);chips.push({s:s.start,h:'<div class="chip se p'+n.color+' pr'+n.pr+(n.done?' is-done':'')+'" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+hm(s.start)+' '+esc(n.title)+'</div>'})}});
-    tasks.forEach(([id,t])=>{if(t.day===k&&!isDone(t)&&!(t.parentId&&items.has(t.parentId))&&!sessions.some(e=>e[1].taskId===id&&occursOn(e[1],k))){const p=projOf(t);chips.push({s:-1.5,h:'<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button">'+esc(t.title)+'</div>'})}});
+    tasks.forEach(([id,t])=>{if(onDay(t,k)&&!isDone(t)&&!(t.parentId&&items.has(t.parentId))&&!sessions.some(e=>e[1].taskId===id&&occursOn(e[1],k))){const p=projOf(t);chips.push({s:-1.5,h:'<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button">'+esc(t.title)+'</div>'})}});
     tasks.forEach(([id,t])=>{if(t.deadline===k&&!isDone(t))chips.push({s:-2,h:'<div class="chip dl" data-task="'+id+'" tabindex="0" role="button">Due: '+esc(t.title)+'</div>'})});
     chips.sort((x,y)=>x.s-y.s);
     cells+='<div class="mcell'+(d.getMonth()!==a.getMonth()?' out':'')+(k===today?' today':'')+'" data-date="'+k+'"><span class="dd">'+d.getDate()+'</span>'+chips.slice(0,4).map(c=>c.h).join('')+(chips.length>4?'<span class="more">+'+(chips.length-4)+' more</span>':'')+'</div>';
@@ -615,7 +759,7 @@ function renderMonth(cal){
   cal.innerHTML='<div class="mhead">'+DN.map(n=>'<div>'+n+'</div>').join('')+'</div><div class="month">'+cells+'</div>';
 }
 let toastT=0;
-function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3800)}
+function toast(msg){if(TD.on&&TD.warned&&Date.now()-TD.warned<400&&!/^Read-only/.test(msg))return;const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3800)}
 
 /* ---------- reminders ---------- */
 function beep(){try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.18);setTimeout(()=>c.close(),400)}catch(e){}}
@@ -685,6 +829,7 @@ function fire(ev,id,depth){
   if(complete&&!depth&&!isDone(n))completeTask(id,1);
 }
 function runTimeRules(){
+  if(TD.on)return;
   if(timeRulesRan)return;timeRulesRan=true;const t=tdy();
   byKind('task').forEach(([id,x])=>{if(isDone(x))return;const nb=nextBlock(id),k=x.day||(nb&&nb.k)||x.deadline||'';if((k&&k<t)||missedBlock(id))fire('overdue',id);else if(k===t)fire('dueToday',id)});
 }
@@ -1074,6 +1219,13 @@ const ACT={
   editList:(b,id)=>{const pid=id||curPid();if(pid)openProject(pid);else toast('Pick one of your own sections in the menu first.')},
   newLane:()=>{st.addIn='newlist';renderBoard();const i=$('#lane-add-input');if(i)i.focus()},
   newSection:()=>openProject(null),
+  tdSyncNow:()=>{if(TD.on)tdSync(false).then(()=>toast('Synced with Todoist.')).catch(()=>{})},
+  tdDisconnect:b=>{
+    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to disconnect';const dm=b.closest('details.menu');setTimeout(()=>{if(dm)dm.open=true},0);return}
+    tdStop();TD.token='';TD.lastOk=0;TD.syncToken='*';try{localStorage.removeItem(TDKEY)}catch(e){}
+    items=new Map();render();showConnect('Disconnected. Paste a token to connect again.');
+    b.dataset.armed='';b.textContent='Disconnect Todoist';$('#m-sync').hidden=true;b.hidden=true;
+  },
   editSection:(b,id)=>openSection(id),
   delSection:(b,id)=>{const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
   cancel:()=>dlg.close(),
