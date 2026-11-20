@@ -107,6 +107,10 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;cursor:grab;user-select:none;min-width:0}
 .card:hover{border-color:var(--mute)}
 .card-top{display:flex;gap:7px;align-items:flex-start}
+.lk{text-decoration:underline;text-underline-offset:2px;color:inherit}
+a.lk:hover{color:var(--accent)}
+.card-t code,.blk-t code,.chip code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--sunk);border-radius:4px;padding:0 3px}
+.card-t b,.blk-t b{font-weight:700}
 .card-t{font-weight:500;font-size:15px;line-height:1.3;overflow-wrap:anywhere;flex:1;min-width:0}
 .is-done .card-t,.is-done>span{text-decoration:line-through;color:var(--mute)}
 .card-m{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;color:var(--mute);font-size:11px;margin-top:3px;padding-left:24px}
@@ -322,6 +326,17 @@ const ACTN={section:'move it to the list named',priority:'set its priority to',a
 const REP={'':'Does not repeat',daily:'Every day',weekdays:'Every weekday',weekly:'Every week',monthly:'Every month'};
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Todoist-style formatting in titles: **bold**, *italic*, `code`, ~~strike~~, [text](url) and bare links.
+   linkable=false shows links as underlined text (inside blocks and chips, where a click opens the task). */
+function fmt(raw,linkable){
+  const codes=[];let h=esc(raw).replace(/`([^`]+)`/g,(m,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000'});
+  const short=u=>u.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'').slice(0,40)+(u.replace(/^https?:\/\/(www\.)?/,'').length>40?'…':'');
+  const link=(u,t)=>linkable?'<a class="lk" href="'+u+'" target="_blank" rel="noopener">'+t+'</a>':'<span class="lk">'+t+'</span>';
+  h=h.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,t,u)=>link(u,t));
+  h=h.replace(/(^|[\s(])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g,(m,pre,u)=>pre+link(u,short(u)));
+  h=h.replace(/\*\*([^*]+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\s](?:[^*]*?[^*\s])?)\*(?![*\w])/g,'$1<i>$2</i>').replace(/~~([^~]+?)~~/g,'<s>$1</s>');
+  return h.replace(/\u0000(\d+)\u0000/g,(m,i)=>'<code>'+codes[+i]+'</code>');
+}
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const pdate=s=>{const p=String(s).split('-').map(Number);return new Date(p[0],p[1]-1,p[2])};
@@ -693,9 +708,9 @@ function cardHtml(id,t,all){
   if(special()&&p){const s=(p.sections||[]).find(x=>x.id===t.sectionId);m.push('<span class="mi"><span class="dot p'+(p.color||0)+'"></span>'+esc(p.name+(s?' / '+s.name:''))+'</span>')}
   return '<div class="card'+(done?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button"><div class="card-top">'+
     '<button class="tk pr'+pr+'" data-act="toggleTask" data-id="'+id+'" aria-label="Complete task">'+(done?'✓':'')+'</button>'+
-    '<div class="card-t">'+esc(t.title)+'</div></div>'+
+    '<div class="card-t">'+fmt(t.title,true)+'</div></div>'+
     (m.length?'<div class="card-m">'+m.join('')+'</div>':'')+
-    (subs.length?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+esc(s.title)+'</span></div>').join('')+'</div>':'')+'</div>';
+    (subs.length?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
 }
 function inLane(l,id,t){
   if(l.type==='proj')return pidOf(t)===l.id&&(st.proj!=='@periodic'||!!t.recur||sessionsOf(id).some(e=>e[1].repeat));
@@ -758,11 +773,11 @@ function blockHtml(b,k){
   const style='top:'+top+'px;height:'+h+'px;left:calc('+(b.c*w)+'% + 1px);width:calc('+w+'% - 3px)';
   const hours='<div class="blk-h">'+hm(it.start)+'–'+hm(it.start+it.dur)+(it.repeat?' ↻':'')+'</div>';
   const attrs='data-id="'+b.id+'" data-date="'+k+'" tabindex="0" role="button" style="'+style+'"';
-  if(it.kind==='event')return '<div class="blk ev" '+attrs+'><div class="blk-t">'+esc(it.title)+'</div>'+hours+'<div class="rs"></div></div>';
+  if(it.kind==='event')return '<div class="blk ev" '+attrs+'><div class="blk-t">'+fmt(it.title)+'</div>'+hours+'<div class="rs"></div></div>';
   const i=sesInfo(it,k);
   return '<div class="blk se p'+i.color+' pr'+i.pr+(i.done?' is-done':'')+'" '+attrs+'>'+
     '<button class="ck" data-act="toggleSes" data-id="'+b.id+'" data-date="'+k+'" aria-label="Mark time block done">'+(sesDone(it,k)?'✓':'')+'</button>'+
-    '<div class="blk-t">'+esc(i.title)+'</div>'+hours+'<div class="rs"></div></div>';
+    '<div class="blk-t">'+fmt(i.title)+'</div>'+hours+'<div class="rs"></div></div>';
 }
 function renderCal(){
   const cal=$('#cal'),keepT=cal.scrollTop,keepL=cal.scrollLeft;
@@ -775,17 +790,17 @@ function renderCal(){
   let ad='';
   events.forEach(([id,e])=>{
     if(!e.allDay)return;
-    if(e.repeat){keys.forEach((k,i)=>{if(occursOn(e,k))ad+='<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">'+esc(e.title)+'</div>'});return}
+    if(e.repeat){keys.forEach((k,i)=>{if(occursOn(e,k))ad+='<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">'+fmt(e.title)+'</div>'});return}
     if(e.date>keys[keys.length-1]||(e.end||e.date)<keys[0])return;
     const a=Math.max(0,diffDays(keys[0],e.date)),b=Math.min(days.length-1,diffDays(keys[0],e.end||e.date));
-    ad+='<div class="chip ev" data-id="'+id+'" data-date="'+e.date+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+esc(e.title)+'</div>';
+    ad+='<div class="chip ev" data-id="'+id+'" data-date="'+e.date+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+fmt(e.title)+'</div>';
   });
   byKind('task').forEach(([id,t])=>{
     if(!t.day||isDone(t)||(t.parentId&&items.has(t.parentId))||t.day>keys[keys.length-1]||lastDay(t)<keys[0])return;
     if(sessions.some(e=>e[1].taskId===id&&occursOn(e[1],t.day)))return;
     const a=Math.max(0,diffDays(keys[0],t.day)),b=Math.min(keys.length-1,diffDays(keys[0],lastDay(t))),p=projOf(t);
-    ad+='<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+esc(t.title)+((t.days||1)>1?' \u00b7 '+t.days+' days':'')+'</div>'});
-  byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.deadline);if(i>=0&&!isDone(t))ad+='<div class="chip dl" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">Due: '+esc(t.title)+'</div>'});
+    ad+='<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+fmt(t.title)+((t.days||1)>1?' \u00b7 '+t.days+' days':'')+'</div>'});
+  byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.deadline);if(i>=0&&!isDone(t))ad+='<div class="chip dl" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">Due: '+fmt(t.title)+'</div>'});
   let gut='';for(let h=7;h<23;h++)gut+='<span style="top:'+((h-6)*H)+'px">'+pad(h)+':00</span>';
   const body=days.map((d,di)=>{
     const k=keys[di],w=wd(d);
@@ -807,10 +822,10 @@ function renderMonth(cal){
   let cells='';
   for(let i=0;i<weeks*7;i++){
     const d=addDays(start,i),k=ymd(d),chips=[];
-    events.forEach(([id,e])=>{if(occursOn(e,k))chips.push({s:e.allDay?-1:e.start,h:'<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+(e.allDay?'':hm(e.start)+' ')+esc(e.title)+'</div>'})});
-    sessions.forEach(([id,s])=>{if(occursOn(s,k)){const n=sesInfo(s,k);chips.push({s:s.start,h:'<div class="chip se p'+n.color+' pr'+n.pr+(n.done?' is-done':'')+'" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+hm(s.start)+' '+esc(n.title)+'</div>'})}});
-    tasks.forEach(([id,t])=>{if(onDay(t,k)&&!isDone(t)&&!(t.parentId&&items.has(t.parentId))&&!sessions.some(e=>e[1].taskId===id&&occursOn(e[1],k))){const p=projOf(t);chips.push({s:-1.5,h:'<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button">'+esc(t.title)+'</div>'})}});
-    tasks.forEach(([id,t])=>{if(t.deadline===k&&!isDone(t))chips.push({s:-2,h:'<div class="chip dl" data-task="'+id+'" tabindex="0" role="button">Due: '+esc(t.title)+'</div>'})});
+    events.forEach(([id,e])=>{if(occursOn(e,k))chips.push({s:e.allDay?-1:e.start,h:'<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+(e.allDay?'':hm(e.start)+' ')+fmt(e.title)+'</div>'})});
+    sessions.forEach(([id,s])=>{if(occursOn(s,k)){const n=sesInfo(s,k);chips.push({s:s.start,h:'<div class="chip se p'+n.color+' pr'+n.pr+(n.done?' is-done':'')+'" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+hm(s.start)+' '+fmt(n.title)+'</div>'})}});
+    tasks.forEach(([id,t])=>{if(onDay(t,k)&&!isDone(t)&&!(t.parentId&&items.has(t.parentId))&&!sessions.some(e=>e[1].taskId===id&&occursOn(e[1],k))){const p=projOf(t);chips.push({s:-1.5,h:'<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'})}});
+    tasks.forEach(([id,t])=>{if(t.deadline===k&&!isDone(t))chips.push({s:-2,h:'<div class="chip dl" data-task="'+id+'" tabindex="0" role="button">Due: '+fmt(t.title)+'</div>'})});
     chips.sort((x,y)=>x.s-y.s);
     cells+='<div class="mcell'+(d.getMonth()!==a.getMonth()?' out':'')+(k===today?' today':'')+'" data-date="'+k+'"><span class="dd">'+d.getDate()+'</span>'+chips.slice(0,4).map(c=>c.h).join('')+(chips.length>4?'<span class="more">+'+(chips.length-4)+' more</span>':'')+'</div>';
   }
@@ -1051,7 +1066,7 @@ function openTask(id,preset){
   const parent=t.parentId&&items.get(t.parentId);
   const prim=id?primarySes(id):null,ps=prim&&prim[1];
   const fDate=ps?ps.date:(t.day||''),fTime=ps?hm(ps.start):'',fDur=ps?ps.dur:(t.est||60),fRep=ps?ps.repeat:t.recur,fRem=ps?ps.remind:10;
-  let body=(parent?'<div class="li"><span>Subtask of: '+esc(parent.title)+'</span><button type="button" data-act="openTask" data-id="'+t.parentId+'">Open</button></div>':'')+
+  let body=(parent?'<div class="li"><span>Subtask of: '+fmt(parent.title)+'</span><button type="button" data-act="openTask" data-id="'+t.parentId+'">Open</button></div>':'')+
     '<label class="fld"><span>Task</span><input type="text" name="title" id="f-title" value="'+esc(t.title)+'" autocomplete="off"></label>'+
     (parent?'':'<div class="row"><label class="fld"><span>Section</span><select name="projectId" id="f-project"><option value="">Inbox</option>'+opts(projs.map(([pid,p])=>[pid,p.name]),pidOf(t))+'</select></label>'+
       '<label class="fld"><span>List</span><select name="sectionId" id="f-section" data-cur="'+esc(t.sectionId||'')+'"></select></label></div>')+
@@ -1064,7 +1079,7 @@ function openTask(id,preset){
     '<div class="fld"><span>Labels</span><input type="hidden" name="labels" id="f-labels" value="'+esc((t.labels||[]).join(' '))+'"><div class="lbl" id="lbl-box"></div></div>'+
     '<label class="fld"><span>Notes</span><textarea name="notes" id="f-notes" rows="2">'+esc(t.notes||'')+'</textarea></label>';
   if(id){
-    if(!parent)body+='<h3>Subtasks</h3><div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(x)?'✓':'')+'</button><span>'+esc(x.title)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>'+
+    if(!parent)body+='<h3>Subtasks</h3><div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>'+
       '<div class="row"><label class="fld"><span>New subtask</span><input type="text" name="subTitle" id="f-subtitle" autocomplete="off"></label><button type="button" data-act="addSub" data-id="'+id+'" id="f-addsub">Add subtask</button></div>';
     body+='<h3>Extra time blocks</h3><div class="hint">For work split over several sittings. The date and time above are the next time block.</div>'+
       (ses.length>1?'<div class="list">'+ses.map(([sid,x])=>'<div class="li"><span>'+sesLine(x)+'</span><button type="button" data-act="delNow" data-id="'+sid+'">Remove</button></div>').join('')+'</div>':'')+
@@ -1331,6 +1346,7 @@ const ACT={
 };
 let lastPT='mouse',noClick=0;
 document.addEventListener('click',e=>{
+  if(e.target.closest('a.lk'))return;
   if(Date.now()<noClick){e.preventDefault();return}
   if(!e.target.closest('details.menu'))document.querySelectorAll('details.menu[open]').forEach(m=>{m.open=false});
   const b=e.target.closest('[data-act]');
