@@ -223,6 +223,28 @@ a.lk:hover{text-decoration-thickness:2px}
 .mcell .more{font-size:11px;color:var(--mute);padding:0 6px}
 
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(500px,calc(100vw - 32px));max-height:calc(100% - 32px)}
+dialog.wide{width:min(880px,calc(100vw - 32px))}
+dialog.wide #dform>h2{font-family:inherit;font-size:13px;font-weight:500;color:var(--mute)}
+.tk-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
+@media (max-width:720px){.tk-grid{grid-template-columns:minmax(0,1fr)}}
+.tk-main,.tk-side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tk-side{background:color-mix(in srgb,var(--sunk) 55%,var(--surface));border-radius:10px;padding:12px}
+.tk-side select,.tk-side input[type=date],.tk-side input[type=time]{background:var(--surface)}
+input.tk-title{font-size:19px;font-weight:500;border-color:transparent;background:transparent;padding:4px 6px;margin-left:-6px}
+input.tk-title:hover{border-color:var(--line)}input.tk-title:focus{border-color:var(--accent);background:var(--surface)}
+.tk-main .nview{border-color:transparent;padding:4px 6px;margin-left:-6px;min-height:3em}.tk-main .nview:hover{border-color:var(--line)}
+.subadd{display:flex;gap:6px;align-items:center}
+button.when{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+button.when .wrep{display:inline-flex;align-items:center;gap:3px;color:var(--mute);font-size:12px}
+button.when svg{width:14px;height:14px;flex:0 0 auto}
+.when-pop{display:flex;flex-direction:column;gap:8px;margin-top:6px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:0 6px 18px rgba(10,14,20,.12)}
+.when-pop .qd{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.when-pop .qd .mini{padding:4px 7px;text-align:left}
+.when-pop>.mini{align-self:flex-end;padding:3px 12px}
+.lchip.off{opacity:.55}
+.remat{display:flex;gap:6px;align-items:center;width:100%}
+.remat input{flex:1 1 auto;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+#rem-sel,#lbl-sel{width:auto;flex:1 1 9em}
 dialog::backdrop{background:rgba(10,14,20,.45)}
 #dform{display:flex;flex-direction:column;gap:10px;padding:18px}
 #dform h2{font-family:var(--f-display);font-size:18px;margin:0;text-wrap:balance}
@@ -462,7 +484,7 @@ function del(id){if(TD.on){tdDel(id);return}items.delete(id);touch();if(local)ls
 const TD={on:false,accounts:[],busy:false,timer:0,warned:0,lastOk:0,taskAcc:new Map(),settings:null};
 const TDKEY='poolplan.todoist.accounts';
 function tdReadOnly(){const fresh=Date.now()-TD.warned>4000;TD.warned=Date.now();if(fresh){toast('Read-only for now: changes aren’t saved to Todoist yet.')}}
-function tdNewAcc(label,token){return {label:label||'',token:token,syncToken:'*',raw:{projects:new Map(),sections:new Map(),items:new Map()},lastOk:0,error:'',email:''}}
+function tdNewAcc(label,token){return {label:label||'',token:token,syncToken:'*',raw:{projects:new Map(),sections:new Map(),items:new Map(),reminders:new Map()},lastOk:0,error:'',email:''}}
 function tdSave(){try{localStorage.setItem(TDKEY,JSON.stringify(TD.accounts.map(a=>({label:a.label,token:a.token}))))}catch(e){}}
 function tdLoadSaved(){
   let list=[];try{list=JSON.parse(localStorage.getItem(TDKEY)||'[]')||[]}catch(e){}
@@ -475,7 +497,7 @@ function showConnect(msg){
   setTimeout(()=>{const i=$('#cname');if(i&&!i.value)i.focus();else{const t=$('#ctoken');if(t)t.focus()}},50);
 }
 async function tdFetch(acc,full){
-  const body=new URLSearchParams({sync_token:full?'*':acc.syncToken,resource_types:JSON.stringify(['user','projects','sections','items'])});
+  const body=new URLSearchParams({sync_token:full?'*':acc.syncToken,resource_types:JSON.stringify(['user','projects','sections','items','reminders'])});
   let r;
   try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
   catch(e){const er=new Error('offline');er.code='offline';throw er}
@@ -485,10 +507,12 @@ async function tdFetch(acc,full){
   return r.json();
 }
 function tdMerge(acc,j){
+  if(!acc.raw.reminders)acc.raw.reminders=new Map();
   if(j.full_sync){acc.raw.projects.clear();acc.raw.sections.clear();acc.raw.items.clear()}
+  if(j.full_sync)acc.raw.reminders.clear();
   if(j.user&&j.user.email)acc.email=j.user.email;
-  ['projects','sections','items'].forEach(k=>{
-    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k!=='items'&&o.is_archived))acc.raw[k].delete(o.id);else acc.raw[k].set(o.id,o)});
+  ['projects','sections','items','reminders'].forEach(k=>{
+    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k!=='items'&&k!=='reminders'&&o.is_archived))acc.raw[k].delete(o.id);else acc.raw[k].set(o.id,o)});
   });
   if(j.sync_token)acc.syncToken=j.sync_token;
 }
@@ -545,7 +569,13 @@ function tdBuildInner(){TD.buildError='';
       else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
       m.set(t.id,task);TD.taskAcc.set(t.id,ai);
     });
+    (a.raw.reminders||new Map()).forEach(r=>{
+      const t=m.get(r.item_id);if(!t||t.kind!=='task'||TD.taskAcc.get(r.item_id)!==ai)return;
+      const x=r.type==='relative'&&r.minute_offset!=null?{id:r.id,min:r.minute_offset}:r.type==='absolute'&&r.due&&r.due.date?{id:r.id,at:String(r.due.date).slice(0,16)}:null;
+      if(x)(t.reminders=t.reminders||[]).push(x);
+    });
   });
+  m.forEach((x,k)=>{if(x.kind!=='session')return;const t=m.get(x.taskId),rel=((t&&t.reminders)||[]).filter(r=>r.min!=null).map(r=>r.min);x.remind=rel.length?Math.min(...rel):-1});
   (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
   if(v['Zone grid'])m.set('zonegrid',{kind:'zonegrid',days:v['Zone grid']});
   (Array.isArray(v.Rules)?v.Rules:[]).forEach((r,i)=>m.set(r.id||('r'+i),Object.assign({kind:'rule'},r)));
@@ -598,6 +628,12 @@ function tdFlushDirty(){
     const r=window.PPMap.diffTask(pr.before,pr.after,TD.structs[pr.ai],tdUuid);
     if(r.refused.length){toast(refusedMsg(r.refused[0]));if(!r.commands.length)tdBuild()}
     r.commands.forEach(c=>{if(c.type==='item_add'&&c.args&&c.args.due==null)delete c.args.due});
+    const t=items.get(id),acc=TD.accounts[pr.ai];
+    if(t&&!t.done&&Array.isArray(t.reminders)&&acc){
+      const had=[];(acc.raw.reminders||new Map()).forEach(x=>{if(x.item_id===id&&(x.type==='relative'||x.type==='absolute'))had.push(x)});
+      had.filter(x=>!t.reminders.some(y=>y.id===x.id)).forEach(x=>r.commands.push({type:'reminder_delete',uuid:tdUuid(),args:{id:x.id}}));
+      t.reminders.filter(y=>!y.id).forEach(y=>r.commands.push({type:'reminder_add',uuid:tdUuid(),temp_id:'rem-'+tdUuid(),args:y.min!=null?{item_id:id,type:'relative',minute_offset:y.min}:{item_id:id,type:'absolute',due:{date:y.at+':00'}}}));
+    }
     if(r.commands.length){if(!byAcc.has(pr.ai))byAcc.set(pr.ai,[]);byAcc.get(pr.ai).push(...r.commands)}
     // manual order inside a list goes to Todoist
     if(pr.after&&pr.before&&pr.after.order!==pr.before.order&&!pr.after.parentId&&!r.refused.length){
@@ -624,7 +660,7 @@ async function tdFlushQueue(){
     while(TD.queue.length){
       const job=TD.queue[0],acc=TD.accounts[job.ai];
       if(!acc){TD.queue.shift();continue}
-      const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items'])});
+      const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items','reminders'])});
       let r;
       try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
       catch(e){TD.sendError='offline';break}
@@ -872,9 +908,12 @@ function repeatText(r){
   const unit=r.freq==='daily'?'day':'month';
   return iv>1?'every '+iv+' '+unit+'s':'every '+unit;
 }
-function repeatFrom(val,date,old){
+function repeatFrom(val,date,old,text){
   if(!val)return null;
+  if(val==='__keep')return old||null;
+  if(val==='__custom'){const t=String(text||'').trim();return t?{freq:'custom',text:t}:(old||null)}
   const same=old&&old.freq===val;
+  if(same&&val!=='weekly')return old;
   if(val==='weekly')return {freq:'weekly',interval:(same&&old.interval)||1,days:same&&old.days&&old.days.length>1?old.days:[wd(pdate(date))]};
   return {freq:val,interval:(same&&old.interval)||1};
 }
@@ -1286,11 +1325,12 @@ let onSave=null,reopen=null,curTask=null;
 const opts=(arr,cur)=>arr.map(([v,l])=>'<option value="'+esc(v)+'"'+(String(v)===String(cur)?' selected':'')+'>'+esc(l)+'</option>').join('');
 function durOpts(cur){const base=[15,30,45,60,90,120,180,240];if(cur&&!base.includes(cur))base.push(cur);base.sort((a,b)=>a-b);return opts(base.map(v=>[v,durText(v)]),cur)}
 const remOpts=cur=>opts([[-1,'No reminder'],[0,'At start'],[5,'5 min before'],[10,'10 min before'],[15,'15 min before'],[30,'30 min before']],cur==null?10:cur);
-const repOpts=r=>opts(Object.keys(REP).map(k=>[k,REP[k]]),r?r.freq:'');
+const repOpts=r=>{const known=r&&REP[r.freq]!=null&&r.freq!=='custom'&&!r.nth&&!r.monthDay&&!((r.interval||1)>1);
+  return (r&&!known?'<option value="__keep" selected>'+esc(repeatText(r))+'</option>':'')+opts(Object.keys(REP).map(k=>[k,REP[k]]),known?r.freq:r?'__keep':'')+'<option value="__custom">Custom, as you\u2019d type it in Todoist\u2026</option>'};
 const timeFld=(name,id,val,g)=>'<span class="tf" data-g="'+(g||'m')+'"><input type="time" name="'+name+'" id="'+id+'" step="900" value="'+val+'"><button type="button" class="mini" data-act="clearTime" aria-label="No time, day only" title="No time, day only">\u2715</button></span>';
 function secOpts(pid,cur){const p=items.get(pid);return '<option value="">No list</option>'+opts(((p&&p.sections)||[]).map(s=>[s.id,s.name]),cur)}
 function openDlg(title,body,save,o){
-  o=o||{};onSave=save;
+  o=o||{};onSave=save;dlg.classList.toggle('wide',!!o.wide);
   form.innerHTML='<h2>'+esc(title)+'</h2>'+body+'<div class="foot">'+
     (o.delId?'<button type="button" class="danger" data-act="del" data-id="'+o.delId+'" id="dlg-del">Delete</button>':'')+(o.extra||'')+'<span class="sp"></span>'+
     '<button type="button" data-act="cancel" id="dlg-cancel">'+(save?'Cancel':'Close')+'</button>'+(save?'<button class="pri" id="dlg-save">'+(o.saveLabel||'Save')+'</button>':'')+'</div>';
@@ -1306,13 +1346,14 @@ function syncForm(){
   if(el.projectId&&el.sectionId&&el.sectionId.dataset.forp!==el.projectId.value){el.sectionId.innerHTML=secOpts(el.projectId.value,el.sectionId.dataset.cur);el.sectionId.dataset.forp=el.projectId.value}
   form.querySelectorAll('[data-when]').forEach(n=>{n.hidden=!n.dataset.when.split(' ').every(x=>fl.has(x))});
   form.querySelectorAll('[data-t]').forEach(n=>{const i=form.querySelector('.tf[data-g="'+n.dataset.t+'"] input'),noT=!!i&&!i.value;if(noT)n.hidden=true;else if(!n.dataset.when)n.hidden=false});
+  whenUpdate();
 }
 form.addEventListener('change',syncForm);
 $('#app-menu').addEventListener('toggle',e=>{const d=e.target;if(!d.open)return;const r=$('#app-menu-btn').getBoundingClientRect(),pop=d.querySelector('.pop');pop.style.left=Math.max(8,r.left)+'px';pop.style.top=(r.bottom+4)+'px'});
 function notesEdit(){const v=$('#f-nview'),ta=$('#f-notes');if(!v||!ta)return;v.hidden=true;ta.hidden=false;ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
 form.addEventListener('click',e=>{if(e.target.closest('#f-nview')&&!e.target.closest('a.lk'))notesEdit()});
 form.addEventListener('keydown',e=>{if(e.target.id==='f-nview'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();notesEdit()}});
-form.addEventListener('focusout',e=>{if(e.target.id!=='f-notes')return;const v=$('#f-nview'),ta=e.target;if(!v)return;v.innerHTML=ta.value.trim()?fmtBlock(ta.value):'<span class="hint">Add notes</span>';ta.hidden=true;v.hidden=false});
+form.addEventListener('focusout',e=>{if(e.target.id!=='f-notes')return;const v=$('#f-nview'),ta=e.target;if(!v)return;v.innerHTML=ta.value.trim()?fmtBlock(ta.value):'<span class="hint">Description</span>';ta.hidden=true;v.hidden=false});
 form.addEventListener('input',e=>{if(e.target.type==='time')syncForm()});
 form.addEventListener('submit',e=>{e.preventDefault();if(onSave&&onSave(new FormData(form))!==false)dlg.close()});
 dlg.addEventListener('close',()=>{curTask=null;reopen=null});
@@ -1347,54 +1388,111 @@ form.addEventListener('focusout',e=>{if(e.target.id==='lbl-new'&&!lblBusy)lblCom
 
 function sesLine(s){return (s.repeat?repeatText(s.repeat)+' from '+dayLabel(s.date):dayLabel(s.date))+' · '+hm(s.start)+'–'+hm(s.start+s.dur)+(!s.repeat&&s.done?' · done':'')}
 function primarySes(id){const nb=nextBlock(id);return nb?[nb.sid,nb.ses]:null}
+/* ---------- task window, laid out like Todoist's ----------
+   Left: name, description, sub-tasks. Right: where it lives, Date (one field: date, time, length, repeat), priority, labels, reminders.
+   The time set under Date is the task's time block on the calendar. */
+const REM_REL=[[0,'At time of task'],[5,'5 min before'],[10,'10 min before'],[15,'15 min before'],[30,'30 min before'],[60,'1 hour before'],[120,'2 hours before'],[1440,'1 day before']];
+function remLabel(x){
+  if(x.at)return dateName(x.at.slice(0,10))+' '+x.at.slice(11,16);
+  const f=REM_REL.find(r=>r[0]===x.min);if(f)return f[1];
+  const m=x.min;return m%1440===0?(m/1440)+' days before':m%60===0?(m/60)+' hours before':m+' min before';
+}
+function remCur(){const h=$('#f-rems');try{return JSON.parse((h&&h.value)||'[]')||[]}catch(e){return []}}
+function remSet(a){const h=$('#f-rems');if(h)h.value=JSON.stringify(a)}
+function whenTimed(){const d=$('#f-day'),ti=$('#f-time');return !!(d&&d.value&&ti&&ti.value)}
+function remBox(){
+  const box=$('#rem-box');if(!box)return;
+  const cur=remCur(),timed=whenTimed(),d=$('#f-day'),ti=$('#f-time');
+  box.innerHTML=cur.map((x,i)=>{const off=x.min!=null&&!timed;
+      return '<span class="lchip'+(off?' off':'')+'"'+(off?' title="Needs a time. It is dropped if you save without one."':'')+'>'+ic('bell')+esc(remLabel(x))+'<button type="button" data-act="remDel" data-id="'+i+'" aria-label="Remove reminder '+esc(remLabel(x))+'">✕</button></span>'}).join('')+
+    (box.dataset.abs
+      ?'<span class="remat"><input type="datetime-local" id="rem-at" aria-label="Reminder date and time" value="'+esc(((d&&d.value)||tdy())+'T'+((ti&&ti.value)||'09:00'))+'"><button type="button" class="mini" data-act="remAt">Add</button></span>'
+      :'<select id="rem-sel" aria-label="Add a reminder"><option value="" selected disabled hidden>Add reminder</option>'+
+        REM_REL.filter(r=>!cur.some(x=>x.min===r[0])).map(r=>'<option value="'+r[0]+'"'+(timed?'':' disabled')+'>'+r[1]+'</option>').join('')+
+        '<option value="abs">At a date and time…</option></select>')+
+    (timed?'':'<span class="hint">Reminders before the start need a time.</span>');
+}
+function whenUpdate(){
+  const b=$('#f-when');if(!b)return;
+  const d=$('#f-day').value,t=$('#f-time').value,du=Number(($('#f-dur')||{}).value)||60,rs=$('#f-rep'),rv=rs?rs.value:'',rt=$('#f-reptext');
+  if(rt)rt.parentNode.hidden=rv!=='__custom';
+  const timed=!!(d&&t);
+  if(b.dataset.timed!==String(timed)){b.dataset.timed=String(timed);remBox()}
+  if(!d){b.className='when';b.innerHTML=ic('cal')+'<span class="hint">No date</span>';return}
+  let txt=dateName(d);
+  if(t){const m=toMin(t);txt+=' '+t+'–'+hm(Math.min(1440,m+du))}
+  const rl=!rv?'':rv==='__custom'?((rt&&rt.value.trim())||''):rv==='__keep'?rs.options[rs.selectedIndex].text:(REP[rv]||'');
+  b.className='when '+dateClass(d);
+  b.innerHTML=ic('cal')+'<span>'+esc(txt)+'</span>'+(rl?'<span class="wrep">'+ic('rep')+esc(rl.toLowerCase())+'</span>':'');
+}
 function openTask(id,preset){
   const t=id?items.get(id):Object.assign({title:'',projectId:curPid(),sectionId:'',parentId:'',priority:4,labels:[],day:'',deadline:'',est:60,notes:''},preset||{});
   if(!t)return;
   curTask=id||null;reopen=id?()=>openTask(id):null;
   const projs=byKind('project').sort(byOrder);
-  const ses=id?sessionsOf(id).sort((a,b)=>(a[1].date+hm(a[1].start)).localeCompare(b[1].date+hm(b[1].start))):[];
   const subs=id?byKind('task').filter(e=>e[1].parentId===id).sort((a,b)=>(a[1].order||0)-(b[1].order||0)):[];
   const parent=t.parentId&&items.get(t.parentId);
   const prim=id?primarySes(id):null,ps=prim&&prim[1];
-  const fDate=ps?ps.date:(t.day||''),fTime=ps?hm(ps.start):'',fDur=ps?ps.dur:(t.est||60),fRep=ps?ps.repeat:t.recur,fRem=ps?ps.remind:10;
-  let body=(parent?'<div class="li"><span>Subtask of: '+fmt(parent.title)+'</span><button type="button" data-act="openTask" data-id="'+t.parentId+'">Open</button></div>':'')+
-    '<label class="fld"><span>Task</span><input type="text" name="title" id="f-title" value="'+esc(t.title)+'" autocomplete="off"></label>'+
-    (parent?'':'<div class="row"><label class="fld"><span>Section</span><select name="projectId" id="f-project"><option value="">Inbox</option>'+opts(projs.map(([pid,p])=>[pid,p.name]),pidOf(t))+'</select></label>'+
-      '<label class="fld"><span>List</span><select name="sectionId" id="f-section" data-cur="'+esc(t.sectionId||'')+'"></select></label></div>')+
-    '<div class="row"><label class="fld"><span>Date</span><input type="date" name="day" id="f-day" value="'+esc(fDate)+'"></label>'+
-    '<label class="fld"><span>Time</span>'+timeFld('time','f-time',fTime,'m')+'</label>'+
-    '<label class="fld" data-t="m"><span>Duration</span><select name="dur" id="f-dur">'+durOpts(fDur)+'</select></label></div>'+
-    '<div class="row"><label class="fld"><span>Priority</span><select name="priority" id="f-priority">'+opts([[1,'P1'],[2,'P2'],[3,'P3'],[4,'P4 (none)']],t.priority||4)+'</select></label>'+
-    '<label class="fld"><span>Repeat</span><select name="rep" id="f-rep">'+repOpts(fRep)+'</select></label>'+
-    '<label class="fld" data-t="m"><span>Reminder</span><select name="remind" id="f-remind">'+remOpts(fRem)+'</select></label></div>'+
+  const fDate=ps?ps.date:(t.day||''),fTime=ps?hm(ps.start):'',fDur=ps?ps.dur:(t.est||60),fRep=ps?ps.repeat:t.recur;
+  const rems=Array.isArray(t.reminders)?t.reminders:(ps&&ps.remind!=null&&ps.remind>=0?[{min:ps.remind}]:[]);
+  const bo=items.get(pidOf(t)),sec=bo&&(bo.sections||[]).find(x=>x.id===t.sectionId);
+  const crumb=!id?'New task':bo?bo.name+(sec?' / '+sec.name:''):'Inbox';
+  let main=(parent?'<div class="li sub-of"><span>Sub-task of '+fmt(parent.title)+'</span><button type="button" data-act="openTask" data-id="'+t.parentId+'">Open</button></div>':'')+
+    '<input type="text" name="title" id="f-title" class="tk-title" value="'+esc(t.title)+'" placeholder="Task name" aria-label="Task name" autocomplete="off">'+
+    '<div class="nview" id="f-nview" tabindex="0" role="button" aria-label="Edit description">'+(t.notes?fmtBlock(t.notes):'<span class="hint">Description</span>')+'</div>'+
+    '<textarea name="notes" id="f-notes" rows="6" hidden aria-label="Description">'+esc(t.notes||'')+'</textarea>';
+  if(id&&!parent)main+='<h3>Sub-tasks</h3>'+(subs.length?'<div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete sub-task">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>':'')+
+    '<div class="subadd"><input type="text" name="subTitle" id="f-subtitle" placeholder="Add sub-task" aria-label="New sub-task" autocomplete="off"><button type="button" class="mini" data-act="addSub" data-id="'+id+'" id="f-addsub">Add</button></div>';
+  const quick=[['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['nextweek','Next week'],['none','No date']];
+  const side=(parent?'':'<label class="fld"><span>Section</span><select name="projectId" id="f-project"><option value="">Inbox</option>'+opts(projs.map(([pid,p])=>[pid,p.name]),pidOf(t))+'</select></label>'+
+      '<label class="fld"><span>List</span><select name="sectionId" id="f-section" data-cur="'+esc(t.sectionId||'')+'"></select></label>')+
+    '<div class="fld"><span>Date</span><button type="button" class="when" id="f-when" data-act="whenToggle" aria-expanded="false" aria-controls="when-pop"></button>'+
+      '<div class="when-pop" id="when-pop" hidden>'+
+        '<div class="qd">'+quick.map(q=>'<button type="button" class="mini" data-act="whenQuick" data-d="'+q[0]+'">'+q[1]+'</button>').join('')+'</div>'+
+        '<label class="fld"><span>Day</span><input type="date" name="day" id="f-day" value="'+esc(fDate)+'"></label>'+
+        '<div class="row"><label class="fld"><span>Time</span>'+timeFld('time','f-time',fTime,'m')+'</label>'+
+        '<label class="fld" data-t="m"><span>Length</span><select name="dur" id="f-dur">'+durOpts(fDur)+'</select></label></div>'+
+        '<label class="fld"><span>Repeat</span><select name="rep" id="f-rep">'+repOpts(fRep)+'</select></label>'+
+        '<label class="fld" hidden><span>Repeat, as typed in Todoist</span><input type="text" name="repText" id="f-reptext" placeholder="every last friday" autocomplete="off" value="'+esc(fRep&&fRep.freq==='custom'?fRep.text:'')+'"></label>'+
+        '<button type="button" class="mini" data-act="whenToggle">Done</button>'+
+      '</div></div>'+
+    '<label class="fld"><span>Priority</span><select name="priority" id="f-priority">'+opts([[1,'Priority 1'],[2,'Priority 2'],[3,'Priority 3'],[4,'Priority 4']],t.priority||4)+'</select></label>'+
     '<div class="fld"><span>Labels</span><input type="hidden" name="labels" id="f-labels" value="'+esc((t.labels||[]).join(' '))+'"><div class="lbl" id="lbl-box"></div></div>'+
-    '<div class="fld"><span>Notes</span><div class="nview" id="f-nview" tabindex="0" role="button" aria-label="Edit notes">'+(t.notes?fmtBlock(t.notes):'<span class="hint">Add notes</span>')+'</div>'+
-    '<textarea name="notes" id="f-notes" rows="5" hidden>'+esc(t.notes||'')+'</textarea></div>';
-  if(id){
-    if(!parent)body+='<h3>Subtasks</h3><div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>'+
-      '<div class="row"><label class="fld"><span>New subtask</span><input type="text" name="subTitle" id="f-subtitle" autocomplete="off"></label><button type="button" data-act="addSub" data-id="'+id+'" id="f-addsub">Add subtask</button></div>';
-    body+='<h3>Extra time blocks</h3><div class="hint">For work split over several sittings. The date and time above are the next time block.</div>'+
-      (ses.length>1?'<div class="list">'+ses.map(([sid,x])=>'<div class="li"><span>'+sesLine(x)+'</span><button type="button" data-act="delNow" data-id="'+sid+'">Remove</button></div>').join('')+'</div>':'')+
-      '<div class="row"><label class="fld"><span>Date</span><input type="date" name="sDate" id="f-sdate" value="'+tdy()+'"></label><label class="fld"><span>Time</span>'+timeFld('sTime','f-stime','09:00','a')+'</label>'+
-      '<label class="fld" data-t="a"><span>Duration</span><select name="sDur" id="f-sdur">'+durOpts(t.est||60)+'</select></label><button type="button" data-act="addSes" data-id="'+id+'" id="f-addses">Add time block</button></div>';
-  }
-  openDlg(id?(parent?'Subtask':'Task'):'New task',body,fd=>saveTask(id,fd),{delId:id,extra:id?'<button type="button" data-act="toggleTask" data-id="'+id+'" id="dlg-complete">'+(isDone(t)?'Reopen':'Complete')+'</button>':''});
-  labelBox();
+    '<div class="fld"><span>Reminders</span><input type="hidden" name="reminders" id="f-rems" value="'+esc(JSON.stringify(rems))+'"><div class="lbl" id="rem-box"></div></div>';
+  const body='<div class="tk-grid"><div class="tk-main">'+main+'</div><aside class="tk-side" aria-label="Task details">'+side+'</aside></div>';
+  openDlg(crumb,body,fd=>saveTask(id,fd),{wide:true,delId:id,extra:id?'<button type="button" data-act="toggleTask" data-id="'+id+'" id="dlg-complete">'+(isDone(t)?'Reopen':'Complete')+'</button>':''});
+  labelBox();remBox();whenUpdate();
 }
+form.addEventListener('change',e=>{
+  if(e.target.id!=='rem-sel')return;
+  const v=e.target.value,box=$('#rem-box');
+  if(v==='abs')box.dataset.abs='1';else if(v!==''){const a=remCur();a.push({min:Number(v)});remSet(a)}
+  remBox();
+});
+form.addEventListener('input',e=>{if(e.target.id==='f-reptext')whenUpdate()});
+form.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  if(e.target.id==='f-subtitle'){e.preventDefault();const b=$('#f-addsub');if(b)b.click()}
+  else if(e.target.id==='rem-at'){e.preventDefault();ACT.remAt()}
+});
 function saveTask(id,fd){
   const title=String(fd.get('title')||'').trim();
   if(!title){toast('Give the task a name.');return false}
-  const old=id?items.get(id):null,date=fd.get('day')||'',time=fd.get('time')||'',dur=Number(fd.get('dur'))||(old&&old.est)||60,rv=fd.get('rep')||'';
+  const old=id?items.get(id):null,date=fd.get('day')||'',time=fd.get('time')||'',dur=Number(fd.get('dur'))||(old&&old.est)||60,rv=fd.get('rep')||'',rtext=fd.get('repText')||'';
   const base={title:title,priority:Number(fd.get('priority'))||4,est:dur,notes:String(fd.get('notes')||''),
     labels:[...new Set(String(fd.get('labels')||'').split(/[,\s]+/).map(x=>x.replace(/^@/,'')).filter(Boolean))]};
   if(fd.has('projectId')){base.projectId=fd.get('projectId')||'';base.sectionId=fd.get('sectionId')||''}
   const timed=!!(date&&time),prim=id?primarySes(id):null;
+  let rems=[];try{rems=JSON.parse(fd.get('reminders')||'[]')||[]}catch(e){}
+  if(!timed)rems=rems.filter(x=>x.at);              // reminders before the start need a time
+  if(fd.has('reminders'))base.reminders=rems;
+  const rel=rems.filter(x=>x.min!=null).map(x=>x.min),remind=rel.length?Math.min(...rel):-1;
   if(timed){base.day='';base.recur=null}
-  else{base.day=date;base.recur=date&&rv?repeatFrom(rv,date,old&&old.recur):null}
+  else{base.day=date;base.recur=date&&rv?repeatFrom(rv,date,old&&old.recur,rtext):null}
   let tid=id;
   if(id){put(id,Object.assign({},old||{kind:'task'},base));syncSubs(id)}else tid=addTask(title,base);
   if(timed){
-    const rp=repeatFrom(rv,date,prim&&prim[1].repeat),start=clamp(toMin(time),0,1440-dur),rm=fd.get('remind'),remind=rm==null||rm===''?10:Number(rm);
+    const rp=repeatFrom(rv,date,prim&&prim[1].repeat,rtext),start=clamp(toMin(time),0,1440-dur);
     if(prim){const n=Object.assign({},prim[1],{date:date,start:start,dur:dur,remind:remind});if(rp)n.repeat=rp;else{delete n.repeat;delete n.doneDates;delete n.skip}put(prim[0],n)}
     else addSession(tid,date,start,dur,rp,remind);
   }else if(prim)del(prim[0]);
@@ -1571,6 +1669,13 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  whenToggle:()=>{const p=$('#when-pop'),b=$('#f-when');if(!p)return;p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));if(p.hidden)b.focus();else{const d=$('#f-day');if(d)d.focus()}},
+  whenQuick:b=>{const d=$('#f-day'),k=b.dataset.d,dw=new Date().getDay();
+    if(k==='none'){d.value='';$('#f-time').value='';const r=$('#f-rep');if(r)r.value=''}
+    else d.value=ymd(addDays(new Date(),k==='today'?0:k==='tomorrow'?1:k==='weekend'?(6-dw+7)%7:((8-dw)%7||7)));
+    syncForm()},
+  remDel:b=>{const a=remCur();a.splice(Number(b.dataset.id),1);remSet(a);remBox()},
+  remAt:()=>{const i=$('#rem-at'),box=$('#rem-box');if(i&&i.value){const a=remCur();a.push({at:i.value.slice(0,16)});remSet(a)}if(box)delete box.dataset.abs;remBox()},
   view:b=>{st.view=b.dataset.v;saveUi();if(st.view==='zones')migrateBands();render()},
   zsel:(b,id)=>{zsel=id||'';renderZones()},
   zedit:(b,id)=>openZone(id),
