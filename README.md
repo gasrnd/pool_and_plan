@@ -1,4 +1,4 @@
-# Pool & Week
+# Pool & Plan
 
 A personal planner: a pool of tasks on the left, a 06:00–23:00 calendar for time blocking on the right.
 

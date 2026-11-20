@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Pool &amp; Week</title>
+<title>Pool &amp; Plan</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>
 /* Layout: one-screen planner. Left rail = project board (sections as lanes), right = day / week / month calendar.
@@ -238,7 +238,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <body>
 
 <header class="top">
-  <div class="brand">Pool <span>&amp;</span> Week</div>
+  <div class="brand">Pool <span>&amp;</span> Plan</div>
   <div class="tabs">
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
@@ -314,17 +314,18 @@ function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.get
 function durText(m){const h=Math.floor(m/60),r=m%60;return (h?h+' h':'')+(h&&r?' ':'')+(r?r+' min':'')||'0 min'}
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+try{['ui','items','alerted'].forEach(k=>{const o='poolweek.'+k,n='poolplan.'+k,v=localStorage.getItem(o);if(v!==null&&localStorage.getItem(n)===null)localStorage.setItem(n,v);if(v!==null)localStorage.removeItem(o)})}catch(e){}
 
 /* ---------- state + storage ---------- */
 let items=new Map(), col=null, local=false, loaded=false, note='', readOnly=false, timeRulesRan=false;
-const st=Object.assign({view:'plan',span:'week',proj:'@today',label:'',sort:'manual',unsched:false,showDone:false},lsGet('poolweek.ui')||{});
+const st=Object.assign({view:'plan',span:'week',proj:'@today',label:'',sort:'manual',unsched:false,showDone:false},lsGet('poolplan.ui')||{});
 st.anchor=new Date();
-const saveUi=()=>lsSet('poolweek.ui',{view:st.view==='zones'?'plan':st.view,span:st.span,proj:st.proj});
-const LS='poolweek.items';
+const saveUi=()=>lsSet('poolplan.ui',{view:st.view==='zones'?'plan':st.view,span:st.span,proj:st.proj});
+const LS='poolplan.items';
 const queues=new Map();
 let drag=null, pendingRender=false, boardBusy=false;
 const alerts=[];
-const seen=lsGet('poolweek.alerted')||{};
+const seen=lsGet('poolplan.alerted')||{};
 const alerted=new Set(seen.day===tdy()?seen.keys:[]);
 
 const byOrder=(a,b)=>((a[1].order||9e15)-(b[1].order||9e15))||a[1].name.localeCompare(b[1].name);
@@ -630,7 +631,7 @@ function checkReminders(){
     alerted.add(key);fresh=true;
     alerts.push({key:key,title:it.kind==='event'?it.title:sesInfo(it,k).title,start:it.start});
   });
-  if(fresh){lsSet('poolweek.alerted',{day:k,keys:[...alerted]});beep();renderAlerts()}
+  if(fresh){lsSet('poolplan.alerted',{day:k,keys:[...alerted]});beep();renderAlerts()}
 }
 function renderAlerts(){
   const el=$('#alerts'),now=new Date(),m=now.getHours()*60+now.getMinutes();
