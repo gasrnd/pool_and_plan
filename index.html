@@ -311,7 +311,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <div class="tabs">
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
-    <button class="tab" data-act="view" data-v="zones" id="tab-zones">Zones</button>
+    <button class="tab" data-act="view" data-v="zones" id="tab-zones">Routine</button>
   </div>
   <div class="nav">
     <button data-act="prev" aria-label="Previous" id="nav-prev">&lsaquo;</button>
@@ -345,7 +345,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
     <div id="board"></div>
   </section>
   <section id="cal" aria-label="Calendar"></section>
-  <section id="zones" aria-label="Weekly zones"></section>
+  <section id="zones" aria-label="Weekly routine"></section>
 </main>
 <div class="connect" id="connect" hidden>
   <div class="cbox">
@@ -1590,13 +1590,13 @@ function renderZones(){
   const zs=zones(),g=zgrid();
   if(zsel===null||(zsel&&!zoneOf(zsel)))zsel=zs.length?zs[0][0]:'';
   const old=$('#z-name'),keep=old?old.value:'',focus=old&&document.activeElement===old,oc=el.querySelector('input[name=zcolor]:checked'),col=oc?+oc.value:zs.length%12+1;
-  const pal='<h2>Zones</h2><div class="hint">Pick a zone, then drag a box across the week to shade those hours. Zones repeat every week and sit behind your time blocks and events on the calendar.</div>'+
+  const pal='<h2>Routine</h2><div class="hint">Pick a routine block, then drag across the week to shade those hours. The routine repeats every week and sits behind your time blocks and events on the calendar.</div>'+
     zs.map(([id,z])=>'<div class="zrow"><button class="zbtn" data-act="zsel" data-id="'+id+'" aria-pressed="'+(zsel===id)+'"><span class="dot p'+(z.color||0)+'"></span>'+esc(z.name)+'</button><button class="mini" data-act="zedit" data-id="'+id+'">Edit</button></div>').join('')+
     '<div class="zrow"><button class="zbtn" data-act="zsel" data-id="" aria-pressed="'+(zsel==='')+'" id="z-eraser">Eraser</button></div>'+
-    '<h3>New zone</h3><input type="text" id="z-name" placeholder="Deep work, Relaxed, Admin" aria-label="New zone name" autocomplete="off">'+
+    '<h3>New routine block</h3><input type="text" id="z-name" placeholder="Deep work, Relaxed, Admin" aria-label="Name of the new routine block" autocomplete="off">'+
     '<div class="seg swatches">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(c=>'<label><input type="radio" name="zcolor" value="'+c+'" id="z-color'+c+'"'+(c===col?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
-    '<div><button data-act="zadd" id="z-add">Add zone</button></div>'+(zs.length?'':'<div class="hint">Add your first zone, then paint it onto the week.</div>')+
-    ([...items.values()].some(x=>x&&x.example)?'<h3>Examples</h3><div class="hint">Example tasks, events and zones are still loaded.</div><div><button data-act="clearEx" id="btn-clear-ex">Clear examples</button></div>':'');
+    '<div><button data-act="zadd" id="z-add">Add routine block</button></div>'+(zs.length?'':'<div class="hint">Add your first routine block, then paint it onto the week.</div>')+
+    ([...items.values()].some(x=>x&&x.example)?'<h3>Examples</h3><div class="hint">Example tasks, events and routine blocks are still loaded.</div><div><button data-act="clearEx" id="btn-clear-ex">Clear examples</button></div>':'');
   let grid='<div class="zh"></div>'+DN.map(n=>'<div class="zh">'+n+'</div>').join('');
   for(let i=0;i<SLOTS;i++){grid+='<div class="zt">'+(i%2===0?hm(S0+i*30):'')+'</div>';for(let d=0;d<7;d++)grid+='<div class="'+zcClass(i,g[d][i])+'" data-d="'+d+'" data-s="'+i+'"></div>'}
   el.innerHTML='<div class="zpal">'+pal+'</div><div class="zgrid" id="zgrid">'+grid+'</div>';
@@ -1606,7 +1606,7 @@ function zRect(){return {d0:Math.min(zp.d0,zp.d1),d1:Math.max(zp.d0,zp.d1),s0:Ma
 function zPaint(){const r=zRect();$('#zones').querySelectorAll('.zc').forEach(c=>{const d=+c.dataset.d,i=+c.dataset.s,inside=d>=r.d0&&d<=r.d1&&i>=r.s0&&i<=r.s1;c.className=zcClass(i,inside?zsel:zp.base[d][i])})}
 $('#zones').addEventListener('pointerdown',e=>{
   const c=e.target.closest('.zc');if(!c||(e.pointerType==='mouse'&&e.button!==0))return;
-  if(zsel&&!zoneOf(zsel)){toast('Add a zone first.');return}
+  if(zsel&&!zoneOf(zsel)){toast('Add a routine block first.');return}
   e.preventDefault();zp={base:zgrid(),d0:+c.dataset.d,s0:+c.dataset.s,d1:+c.dataset.d,s1:+c.dataset.s};zPaint();
 });
 document.addEventListener('pointermove',e=>{
@@ -1621,10 +1621,10 @@ document.addEventListener('pointerup',()=>{
 document.addEventListener('pointercancel',()=>{if(zp){zp=null;render()}});
 function openZone(id){
   const z=zoneOf(id);if(!z)return;curTask=null;reopen=null;
-  openDlg('Zone','<label class="fld"><span>Zone name</span><input type="text" name="name" id="f-zname" value="'+esc(z.name)+'" autocomplete="off"></label>'+
+  openDlg('Routine block','<label class="fld"><span>Name</span><input type="text" name="name" id="f-zname" value="'+esc(z.name)+'" autocomplete="off"></label>'+
     '<div class="seg swatches">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(c=>'<label><input type="radio" name="color" value="'+c+'" id="f-zcolor'+c+'"'+(c===(z.color||1)?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
-    '<div class="hint">Deleting a zone clears its hours from the week.</div>',fd=>{
-    const name=String(fd.get('name')||'').trim();if(!name){toast('Give the zone a name.');return false}
+    '<div class="hint">Deleting a routine block clears its hours from the week.</div>',fd=>{
+    const name=String(fd.get('name')||'').trim();if(!name){toast('Give the routine block a name.');return false}
     put(id,Object.assign({},z,{name:name,color:Number(fd.get('color'))||1}));return true;
   },{delId:id});
 }
@@ -1689,7 +1689,7 @@ const ACT={
   view:b=>{st.view=b.dataset.v;saveUi();if(st.view==='zones')migrateBands();render()},
   zsel:(b,id)=>{zsel=id||'';renderZones()},
   zedit:(b,id)=>openZone(id),
-  zadd:()=>{const n=$('#z-name'),name=n.value.trim();if(!name){toast('Give the zone a name.');n.focus();return}const c=$('#zones').querySelector('input[name=zcolor]:checked'),id=nid();n.value='';zsel=id;put(id,{kind:'zone',name:name,color:c?+c.value:1,order:Date.now()})},
+  zadd:()=>{const n=$('#z-name'),name=n.value.trim();if(!name){toast('Give the routine block a name.');n.focus();return}const c=$('#zones').querySelector('input[name=zcolor]:checked'),id=nid();n.value='';zsel=id;put(id,{kind:'zone',name:name,color:c?+c.value:1,order:Date.now()})},
   span:b=>{st.span=b.dataset.v;saveUi();render()},
   prev:()=>{stepAnchor(-1);render()},
   next:()=>{stepAnchor(1);render()},
