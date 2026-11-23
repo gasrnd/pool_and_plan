@@ -7,18 +7,18 @@
 :root{
   --bg:#E8EBF0; --surface:#F6F8FA; --sunk:#DCE1E8; --line:#CBD2DB; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
   --accent:#0B7A85; --accent-ink:#FFFFFF; --band:rgba(226,160,30,.20); --band-ink:#7A5200; --now:#D6364B;
-  --p1:#2E8B57; --p2:#12827F; --p3:#7A4FC4; --p4:#B23D8E; --p5:#8B5E34; --p6:#6E7F1F; --dtoday:#0E8F6E; --dtom:#B5580F;
+  --p1:#2E8B57; --p2:#12827F; --p3:#7A4FC4; --p4:#B23D8E; --p5:#8B5E34; --p6:#6E7F1F; --p7:#5F6B7A; --p8:#4E9A2E; --p9:#8A7563; --p10:#B8678A; --p11:#2F9E8C; --p12:#9A6FB0; --dtoday:#0E8F6E; --dtom:#B5580F;
   --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   --hh:48px; --r:8px;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark } }
+  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark }
+  --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark }
 
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -143,7 +143,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .sub{display:flex;gap:6px;align-items:flex-start;font-size:12px;cursor:pointer}
 .sub .tk{width:14px;height:14px;font-size:9px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--pc);flex:none;display:inline-block}
-.p0{--pc:var(--mute)}.p1{--pc:var(--p1)}.p2{--pc:var(--p2)}.p3{--pc:var(--p3)}.p4{--pc:var(--p4)}.p5{--pc:var(--p5)}.p6{--pc:var(--p6)}
+.p0{--pc:var(--mute)}.p1{--pc:var(--p1)}.p2{--pc:var(--p2)}.p3{--pc:var(--p3)}.p4{--pc:var(--p4)}.p5{--pc:var(--p5)}.p6{--pc:var(--p6)}.p7{--pc:var(--p7)}.p8{--pc:var(--p8)}.p9{--pc:var(--p9)}.p10{--pc:var(--p10)}.p11{--pc:var(--p11)}.p12{--pc:var(--p12)}
 .board #board.hz,#board.hz{display:grid;grid-auto-flow:column;grid-auto-columns:min(86%,var(--lwp,340px));align-items:start;overflow:auto;scroll-snap-type:x proximity}
 #main.board #board.hz{grid-auto-columns:minmax(230px,1fr)}
 #board.hz .lane{scroll-snap-align:start}
@@ -179,8 +179,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .gutcol{position:sticky;left:0;background:var(--surface);z-index:3}
 .gutcol span{position:absolute;right:6px;transform:translateY(-50%);font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums}
 .daycol{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% var(--hh);min-width:0;overflow:hidden}
-.band{position:absolute;left:0;right:0;background:color-mix(in srgb,var(--pc,var(--band-ink)) 15%,transparent);pointer-events:none;overflow:hidden}
-.band span{display:block;font-size:8.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--pc,var(--band-ink)) 45%,var(--surface));padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band{position:absolute;left:0;right:0;background:color-mix(in srgb,var(--pc,var(--band-ink)) 8%,transparent);pointer-events:none;overflow:hidden}
+.band span{display:block;font-size:8.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--pc,var(--band-ink)) 34%,var(--surface));padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .now{position:absolute;left:0;right:0;height:2px;background:var(--now);z-index:4;pointer-events:none}
 .blk{position:absolute;border-radius:5px;padding:2px 5px 6px;overflow:hidden;cursor:grab;user-select:none;z-index:2;font-size:12px;line-height:1.25;min-width:0}
 .blk-t{font-weight:500;overflow-wrap:anywhere}
@@ -211,7 +211,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .zt{font-size:11px;color:var(--mute);text-align:right;padding-right:6px;height:18px;line-height:1;font-variant-numeric:tabular-nums}
 .zc{height:18px;border-left:1px solid var(--line);cursor:crosshair}
 .zc.hr{border-top:1px solid var(--line)}
-.zc.on{background:color-mix(in srgb,var(--pc) 42%,var(--surface))}
+.zc.on{background:color-mix(in srgb,var(--pc) 22%,var(--surface))}
+.seg.swatches{display:grid;grid-template-columns:repeat(6,1fr)}
 .month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(104px,1fr);min-height:100%}
 .mhead{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));position:sticky;top:0;background:var(--surface);z-index:6;border-bottom:1px solid var(--line)}
 .mhead div{text-align:center;padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
@@ -1567,7 +1568,7 @@ function migrateBands(){
   const days=zgrid();let allEx=true;
   bands.forEach(([id,b])=>{
     const hit=zones().find(e=>e[1].name===(b.label||'Focus'));let zid;
-    if(hit)zid=hit[0];else{zid=nid();const o={kind:'zone',name:b.label||'Focus',color:zones().length%6+1,order:Date.now()};if(b.example)o.example=true;put(zid,o)}
+    if(hit)zid=hit[0];else{zid=nid();const o={kind:'zone',name:b.label||'Focus',color:zones().length%12+1,order:Date.now()};if(b.example)o.example=true;put(zid,o)}
     if(!b.example)allEx=false;
     (b.days||[]).forEach(d=>{for(let i=0;i<SLOTS;i++){const m=S0+i*30;if(m>=b.start&&m<b.end)days[d][i]=zid}});
     del(id);
@@ -1580,12 +1581,12 @@ function renderZones(){
   if(zp)return;
   const zs=zones(),g=zgrid();
   if(zsel===null||(zsel&&!zoneOf(zsel)))zsel=zs.length?zs[0][0]:'';
-  const old=$('#z-name'),keep=old?old.value:'',focus=old&&document.activeElement===old,oc=el.querySelector('input[name=zcolor]:checked'),col=oc?+oc.value:zs.length%6+1;
+  const old=$('#z-name'),keep=old?old.value:'',focus=old&&document.activeElement===old,oc=el.querySelector('input[name=zcolor]:checked'),col=oc?+oc.value:zs.length%12+1;
   const pal='<h2>Zones</h2><div class="hint">Pick a zone, then drag a box across the week to shade those hours. Zones repeat every week and sit behind your time blocks and events on the calendar.</div>'+
     zs.map(([id,z])=>'<div class="zrow"><button class="zbtn" data-act="zsel" data-id="'+id+'" aria-pressed="'+(zsel===id)+'"><span class="dot p'+(z.color||0)+'"></span>'+esc(z.name)+'</button><button class="mini" data-act="zedit" data-id="'+id+'">Edit</button></div>').join('')+
     '<div class="zrow"><button class="zbtn" data-act="zsel" data-id="" aria-pressed="'+(zsel==='')+'" id="z-eraser">Eraser</button></div>'+
     '<h3>New zone</h3><input type="text" id="z-name" placeholder="Deep work, Relaxed, Admin" aria-label="New zone name" autocomplete="off">'+
-    '<div class="seg">'+[1,2,3,4,5,6].map(c=>'<label><input type="radio" name="zcolor" value="'+c+'" id="z-color'+c+'"'+(c===col?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
+    '<div class="seg swatches">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(c=>'<label><input type="radio" name="zcolor" value="'+c+'" id="z-color'+c+'"'+(c===col?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
     '<div><button data-act="zadd" id="z-add">Add zone</button></div>'+(zs.length?'':'<div class="hint">Add your first zone, then paint it onto the week.</div>')+
     ([...items.values()].some(x=>x&&x.example)?'<h3>Examples</h3><div class="hint">Example tasks, events and zones are still loaded.</div><div><button data-act="clearEx" id="btn-clear-ex">Clear examples</button></div>':'');
   let grid='<div class="zh"></div>'+DN.map(n=>'<div class="zh">'+n+'</div>').join('');
@@ -1613,7 +1614,7 @@ document.addEventListener('pointercancel',()=>{if(zp){zp=null;render()}});
 function openZone(id){
   const z=zoneOf(id);if(!z)return;curTask=null;reopen=null;
   openDlg('Zone','<label class="fld"><span>Zone name</span><input type="text" name="name" id="f-zname" value="'+esc(z.name)+'" autocomplete="off"></label>'+
-    '<div class="seg">'+[1,2,3,4,5,6].map(c=>'<label><input type="radio" name="color" value="'+c+'" id="f-zcolor'+c+'"'+(c===(z.color||1)?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
+    '<div class="seg swatches">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(c=>'<label><input type="radio" name="color" value="'+c+'" id="f-zcolor'+c+'"'+(c===(z.color||1)?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
     '<div class="hint">Deleting a zone clears its hours from the week.</div>',fd=>{
     const name=String(fd.get('name')||'').trim();if(!name){toast('Give the zone a name.');return false}
     put(id,Object.assign({},z,{name:name,color:Number(fd.get('color'))||1}));return true;
@@ -1643,7 +1644,7 @@ function openProject(id){
   const p=id?items.get(id):{name:'',color:byKind('project').length%6+1,sections:[]};if(!p)return;
   curTask=null;reopen=null;
   const body='<label class="fld"><span>Section name</span><input type="text" name="name" id="f-pname" value="'+esc(p.name)+'" autocomplete="off"></label>'+
-    '<div class="seg">'+[1,2,3,4,5,6].map(c=>'<label><input type="radio" name="color" value="'+c+'" id="f-pcolor'+c+'"'+(c===(p.color||1)?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
+    '<div class="seg swatches">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(c=>'<label><input type="radio" name="color" value="'+c+'" id="f-pcolor'+c+'"'+(c===(p.color||1)?' checked':'')+'><span class="dot p'+c+'"></span></label>').join('')+'</div>'+
     (id?'<div class="hint">A section can be a project, an area of life or any category. Its lists are the columns on the board. Deleting the section moves its tasks to the Inbox.</div>':'<label class="fld"><span>Lists, separated by commas</span><input type="text" name="sections" id="f-psections" value="Pool, This week, Doing" autocomplete="off"></label>');
   openDlg(id?'Section':'New section',body,fd=>{
     const name=String(fd.get('name')||'').trim();if(!name){toast('Give the section a name.');return false}
