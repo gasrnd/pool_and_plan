@@ -51,6 +51,14 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 
 #strip{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:7px 12px;color:var(--mute)}
 #strip button{padding:3px 9px}
+button.pomo{position:relative;overflow:hidden;color:var(--mute);font-variant-numeric:tabular-nums;font-size:13px}
+button.pomo::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:calc(var(--p,0)*100%);background:color-mix(in srgb,var(--accent) 55%,transparent)}
+button.pomo.due{color:var(--ink);border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
+button.pomo.due::after{background:var(--accent)}
+button.pomo.away{opacity:.6}
+button.pomo.off{font-style:italic}
+.chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;color:var(--ink)}
 #sendpill{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:50;max-width:min(360px,calc(100vw - 28px));font-size:12px;color:var(--mute);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;box-shadow:0 4px 14px rgba(10,14,20,.10);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none}
 #sendpill.on{opacity:1;transform:none}
 #sendpill.err{color:var(--ink);border-radius:10px}
@@ -302,7 +310,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 </style>
 
 <header class="top">
-  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button></div></details>
+  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button><button type="button" data-act="pomoOpen" id="m-pomo">Pomodoros</button><button type="button" data-act="openNotify" id="m-notify">Notifications</button></div></details>
   <div class="tabs">
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
@@ -315,6 +323,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
     <span id="range"></span>
   </div>
   <div class="tools">
+    <button data-act="pomoClick" id="pomo" class="pomo" hidden></button>
     <button data-act="newTask" id="btn-new-task">New task</button>
     <button data-act="rules" id="btn-rules">Rules</button>
     <div class="tabs" id="span-tabs" aria-label="Calendar range">
@@ -1197,6 +1206,136 @@ function renderAlerts(){
   el.innerHTML=alerts.map(a=>'<div class="alert"><span>'+esc(a.title)+' '+(m<a.start?'starts at '+hm(a.start)+' (in '+(a.start-m)+' min)':'started at '+hm(a.start))+'</span><button data-act="dismiss" data-id="'+esc(a.key)+'">Dismiss</button></div>').join('');
 }
 
+
+/* ---------- Notifications: alerts go to the phone through ntfy (the watch mirrors the phone), optionally a pop-up here ----------
+   Settings are kept in this browser only. Only the alert text is sent, never task data. */
+const NKEY='poolplan.notify';
+const nDefaults=()=>({server:'https://ntfy.sh',topic:'',desktop:false});
+function nGet(){try{return Object.assign(nDefaults(),JSON.parse(localStorage.getItem(NKEY)||'{}'))}catch(e){return nDefaults()}}
+function nSet(o){try{localStorage.setItem(NKEY,JSON.stringify(o))}catch(e){}}
+function nTopic(){const a=new Uint8Array(16);crypto.getRandomValues(a);return 'poolplan-'+[...a].map(x=>(x%36).toString(36)).join('')}
+async function notify(title,message,o){
+  o=o||{};const c=o.cfg||nGet();let ok=false;
+  if(c.topic){
+    try{const r=await fetch(String(c.server||'https://ntfy.sh').replace(/\/+$/,'')+'/',{method:'POST',
+      body:JSON.stringify({topic:c.topic,title:title,message:message||title,priority:o.priority||4,tags:o.tags?[o.tags]:[]})});ok=r.ok}catch(e){}
+  }
+  if(c.desktop&&'Notification' in window&&Notification.permission==='granted'){try{new Notification(title,{body:message||''});ok=true}catch(e){}}
+  return ok;
+}
+function openNotify(){
+  const c=nGet(),topic=c.topic||nTopic(),dsk='Notification' in window;
+  const body='<div class="hint">Alerts go to your phone through the free <b>ntfy</b> app, and your watch shows them like any other phone notification. Only the alert text is sent, never your tasks.</div>'+
+    '<h3>Phone</h3><ol class="steps"><li>Install <b>ntfy</b> on your phone.</li><li>In ntfy, tap + and subscribe to the channel below.</li><li>In the Garmin Connect app, allow notifications from ntfy.</li></ol>'+
+    '<div class="row"><label class="fld"><span>Channel</span><input type="text" name="topic" id="n-topic" value="'+esc(topic)+'" autocomplete="off" spellcheck="false"></label>'+
+    '<button type="button" data-act="nCopy">Copy</button><button type="button" data-act="nNew">New</button></div>'+
+    '<div class="hint">Whoever knows this name can read its alerts, so keep it long and random.</div>'+
+    '<div class="row"><button type="button" data-act="nTest" id="n-test">Send a test</button><span id="n-res" class="hint" role="status"></span></div>'+
+    '<details><summary class="hint">Use my own ntfy server</summary><label class="fld"><span>Server</span><input type="text" name="server" id="n-server" value="'+esc(c.server)+'" autocomplete="off"></label></details>'+
+    (dsk?'<h3>This computer</h3><label class="chkrow"><input type="checkbox" name="desktop" id="n-desktop"'+(c.desktop?' checked':'')+'> Also show a pop-up here</label>':'');
+  openDlg('Notifications',body,fd=>{
+    const o={server:String(fd.get('server')||'').trim()||'https://ntfy.sh',topic:String(fd.get('topic')||'').trim(),desktop:fd.get('desktop')==='on'};
+    nSet(o);
+    if(o.desktop&&Notification.permission!=='granted')Notification.requestPermission().then(p=>{if(p!=='granted'){o.desktop=false;nSet(o);toast('The browser didn’t allow pop-ups. Phone alerts still work.')}});
+    toast(o.topic?'Notifications saved.':'Phone alerts are off.');pomoRender();
+  });
+}
+const nFormCfg=()=>({server:(($('#n-server')||{}).value||'').trim()||'https://ntfy.sh',topic:(($('#n-topic')||{}).value||'').trim(),desktop:false});
+
+/* ---------- Pomodoros: counts screen time on this computer (Chrome or Edge) and sends a break alert ----------
+   A new pomodoro starts after a lock of the screen, a long enough pause, or the computer sleeping. Phones are never counted. */
+const PKEY='poolplan.pomo',PRUN='poolplan.pomo.run';
+const pDefaults=()=>({on:true,work:50,again:5,lockBreak:true,awayMin:5});
+function pGet(){try{return Object.assign(pDefaults(),JSON.parse(localStorage.getItem(PKEY)||'{}'))}catch(e){return pDefaults()}}
+function pSet(o){try{localStorage.setItem(PKEY,JSON.stringify(o))}catch(e){}}
+function runGet(){try{return JSON.parse(localStorage.getItem(PRUN)||'null')}catch(e){return null}}
+function runSet(o){try{localStorage.setItem(PRUN,JSON.stringify(o))}catch(e){}}
+const POMO={det:null,ctl:null,perm:'',awaySince:0,lockedSeen:false,lastTick:0,err:''};
+const pomoPC=()=>'IdleDetector' in window&&!!(window.matchMedia&&matchMedia('(any-pointer:fine)').matches);
+const pomoAway=()=>{const d=POMO.det;return !!d&&(d.userState==='idle'||d.screenState==='locked')};
+async function pomoStart(fromClick){
+  POMO.err='';
+  if(!pGet().on||!pomoPC()){pomoRender();return}
+  try{
+    if(fromClick)POMO.perm=await IdleDetector.requestPermission();
+    else{const q=await navigator.permissions.query({name:'idle-detection'});POMO.perm=q.state}
+    if(POMO.perm!=='granted'){pomoRender();return}
+    if(POMO.ctl)POMO.ctl.abort();
+    POMO.ctl=new AbortController();const d=new IdleDetector();POMO.det=d;
+    d.addEventListener('change',pomoChange);
+    await d.start({threshold:60000,signal:POMO.ctl.signal});
+    pomoChange();
+  }catch(e){POMO.det=null;POMO.err=String((e&&e.message)||e)}
+  pomoRender();
+}
+function pomoStop(){if(POMO.ctl)POMO.ctl.abort();POMO.ctl=null;POMO.det=null;pomoRender()}
+function pomoChange(){
+  const d=POMO.det;if(!d)return;const now=Date.now(),c=pGet();
+  if(d.screenState==='locked')POMO.lockedSeen=true;
+  if(pomoAway()){if(!POMO.awaySince)POMO.awaySince=now-(d.userState==='idle'?60000:0)}
+  else{
+    const r=runGet(),brk=!r||(c.lockBreak&&POMO.lockedSeen)||(POMO.awaySince&&now-POMO.awaySince>=c.awayMin*60000);
+    if(brk)runSet({start:now,alerted:0});
+    POMO.awaySince=0;POMO.lockedSeen=false;
+  }
+  pomoTick();
+}
+function pomoTick(){
+  const c=pGet(),now=Date.now();
+  if(!c.on||!POMO.det){pomoRender();return}
+  // the computer slept or the page was frozen for longer than a break: start fresh
+  if(POMO.lastTick&&now-POMO.lastTick>c.awayMin*60000)runSet({start:now,alerted:0});
+  POMO.lastTick=now;
+  let r=runGet();if(!r){r={start:now,alerted:0};runSet(r)}
+  const due=now-r.start>=c.work*60000;
+  if(due&&!pomoAway()&&(!r.alerted||(c.again>0&&now-r.alerted>=c.again*60000))){
+    // with several tabs open, only the one whose mark survives sends the alert
+    const mark=now+Math.random();r.alerted=mark;runSet(r);
+    setTimeout(()=>{const x=runGet();if(!x||x.alerted!==mark)return;
+      const mins=Math.round((Date.now()-x.start)/60000);
+      notify('Time for a break','You’ve been at the screen for '+mins+' min. Lock the screen or step away to start a new pomodoro.',{tags:'tomato'});
+      try{beep()}catch(e){}
+    },400);
+  }
+  pomoRender();
+}
+function pomoRender(){
+  const b=$('#pomo');if(!b)return;const c=pGet();
+  if(!c.on||!pomoPC()){b.hidden=true;return}
+  b.hidden=false;
+  if(!POMO.det){b.className='pomo off';b.textContent='Pomodoro';b.title=POMO.perm==='denied'?'Screen activity detection is blocked for this site':'Click to allow screen activity detection';b.style.removeProperty('--p');return}
+  const r=runGet(),m=r?Math.max(0,Math.floor((Date.now()-r.start)/60000)):0,over=m>=c.work;
+  b.className='pomo'+(over?' due':'')+(pomoAway()?' away':'');
+  b.style.setProperty('--p',String(Math.min(1,m/c.work)));
+  b.textContent=over?'Break time · '+m+' min':m+' / '+c.work+' min';
+  b.title='Screen time since your last break';
+}
+function openPomo(){
+  const c=pGet(),n=nGet(),r=runGet(),m=r&&POMO.det?Math.floor((Date.now()-r.start)/60000):null;
+  const perm=!('IdleDetector' in window)?'<div class="hint">Pomodoros need Chrome or Edge on a computer: they are the only browsers that can tell when you lock the screen or step away.</div>'
+    :!pomoPC()?'<div class="hint">Only screen time on a computer is counted, so pomodoros are off on this device.</div>'
+    :POMO.det?'<div class="li"><span>Screen activity: detected on this computer.</span></div>'
+    :POMO.perm==='denied'?'<div class="hint">The browser is blocking screen activity detection for this site. Allow it in the site settings (the icon left of the address), then reload.</div>'
+    :'<div class="li"><span>Screen activity: not allowed yet.</span><button type="button" data-act="pomoAllow">Allow</button></div>';
+  const body='<label class="chkrow"><input type="checkbox" name="on" id="p-on"'+(c.on?' checked':'')+'> Count my screen time on this computer</label>'+
+    '<div class="row"><label class="fld"><span>Pomodoro length</span><select name="work" id="p-work">'+opts([25,30,40,45,50,60,75,90].map(x=>[x,x+' min']),c.work)+'</select></label>'+
+    '<label class="fld"><span>If I keep going, remind me again</span><select name="again" id="p-again">'+opts([[0,'No'],[5,'Every 5 min'],[10,'Every 10 min'],[15,'Every 15 min']],c.again)+'</select></label></div>'+
+    '<h3>A new pomodoro starts when</h3>'+
+    '<label class="chkrow"><input type="checkbox" name="lockBreak" id="p-lock"'+(c.lockBreak?' checked':'')+'> I lock the screen, however briefly</label>'+
+    '<div class="row"><label class="fld"><span>or I don’t touch the computer for</span><select name="awayMin" id="p-away">'+opts([2,3,5,10,15].map(x=>[x,x+' min']),c.awayMin)+'</select></label></div>'+
+    '<div class="hint">Shorter pauses, like reading without touching anything, still count. A computer that sleeps also starts a new pomodoro.</div>'+
+    '<h3>This computer</h3>'+perm+
+    (m!=null?'<div class="li"><span>Current pomodoro: '+m+' min</span><button type="button" data-act="pomoReset">Start a new one now</button></div>':'')+
+    '<h3>Alerts</h3><div class="li"><span>'+(n.topic?'Sent to your phone through ntfy'+(n.desktop?' and shown here':'')+'.':n.desktop?'Shown on this computer only. Phone alerts aren’t set up.':'Not set up yet: you’d get no alert.')+'</span><button type="button" data-act="openNotify">'+(n.topic?'Change':'Set up')+'</button></div>';
+  openDlg('Pomodoros',body,fd=>{
+    pSet({on:fd.get('on')==='on',work:Number(fd.get('work'))||50,again:Number(fd.get('again'))||0,lockBreak:fd.get('lockBreak')==='on',awayMin:Number(fd.get('awayMin'))||5});
+    if(pGet().on)pomoStart(false);else pomoStop();
+  });
+}
+setInterval(()=>{try{pomoTick()}catch(e){}},20000);
+window.addEventListener('storage',e=>{if(e.key===PRUN||e.key===PKEY)pomoRender()});
+setTimeout(()=>pomoStart(false),0);
+
 /* ---------- mutations + rules ---------- */
 function nextOrder(){return byKind('task').reduce((m,e)=>Math.max(m,e[1].order||0),0)+1}
 function addTask(title,extra){
@@ -1686,6 +1825,15 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  pomoOpen:()=>openPomo(),
+  pomoClick:()=>{if(!POMO.det&&POMO.perm!=='denied')pomoStart(true);else openPomo()},
+  pomoAllow:()=>{pomoStart(true).then(()=>{if(dlg.open)openPomo()})},
+  pomoReset:()=>{runSet({start:Date.now(),alerted:0});pomoRender();openPomo()},
+  openNotify:()=>openNotify(),
+  nNew:()=>{const i=$('#n-topic');if(i)i.value=nTopic()},
+  nCopy:()=>{const i=$('#n-topic');if(!i)return;const t=i.value;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Channel name copied.'),()=>{i.focus();i.select()})},
+  nTest:()=>{const res=$('#n-res'),cfg=nFormCfg();if(!cfg.topic){res.textContent='Add a channel first.';return}res.textContent='Sending\u2026';
+    notify('Pool & Plan','Test alert: notifications reach this phone.',{cfg:cfg,tags:'bell'}).then(ok=>{res.textContent=ok?'Sent. It should show on your phone (and watch) in a few seconds.':'Couldn\u2019t reach ntfy. Check the server address and your connection.'})},
   reschedOpen:()=>{st.resched=!st.resched;render()},
   reschedTo:b=>reschedAll(quickDay(b.dataset.d)),
   whenToggle:()=>{const p=$('#when-pop'),b=$('#f-when');if(!p)return;p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));if(p.hidden)b.focus();else{const d=$('#f-day');if(d)d.focus()}},
