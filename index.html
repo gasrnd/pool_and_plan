@@ -56,6 +56,9 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 
 #strip{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:7px 12px;color:var(--mute)}
 #strip button{padding:3px 9px}
+#sendpill{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:50;max-width:min(360px,calc(100vw - 28px));font-size:12px;color:var(--mute);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;box-shadow:0 4px 14px rgba(10,14,20,.10);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none}
+#sendpill.on{opacity:1;transform:none}
+#sendpill.err{color:var(--ink);border-radius:10px}
 #alerts{display:flex;flex-direction:column;gap:6px}
 .alert{display:flex;align-items:center;gap:10px;background:var(--accent);color:var(--accent-ink);border-radius:var(--r);padding:7px 8px 7px 12px;font-weight:500}
 .alert span{flex:1;min-width:0;overflow-wrap:anywhere}
@@ -967,6 +970,21 @@ function renderTop(){
   ['plan','board','zones'].forEach(v=>$('#tab-'+v).setAttribute('aria-selected',st.view===v));
   ['day','3','5','week','month'].forEach(v=>$('#span-'+v).setAttribute('aria-selected',st.span===v));
 }
+// Sending status floats in a corner so the page never shifts. Quick saves show nothing; only a slow or failed one shows.
+let pillTimer=0;
+function sendPill(){
+  let el=$('#sendpill');
+  if(!el){el=document.createElement('div');el.id='sendpill';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el)}
+  const n=TD.on?TD.queue.reduce((x,j)=>x+j.cmds.length,0):0;
+  if(!n){clearTimeout(pillTimer);pillTimer=0;el.classList.remove('on');return}
+  const msg=TD.sendError==='offline'?'Todoist can’t be reached. '+n+(n===1?' change':' changes')+' saved here, trying again every minute.'
+    :TD.sendError==='busy'?'Todoist asked to slow down. Trying again in a minute.'
+    :TD.sendError==='auth'?'Todoist didn’t accept the token. Logo menu → Accounts to replace it.'
+    :'Saving to Todoist…';
+  el.textContent=msg;el.classList.toggle('err',!!TD.sendError);
+  if(TD.sendError){clearTimeout(pillTimer);pillTimer=0;el.classList.add('on');return}
+  if(!el.classList.contains('on')&&!pillTimer)pillTimer=setTimeout(()=>{pillTimer=0;if(TD.queue.length)el.classList.add('on')},1500);
+}
 function renderStrip(){
   const s=$('#strip'),parts=[];
   if(TD.on){
@@ -977,8 +995,7 @@ function renderStrip(){
     });
     if(TD.buildError)parts.push('Your Todoist loaded, but Pool & Plan couldn\u2019t lay it out: '+TD.buildError+'. Please send this message to get it fixed.');
     if(TD.renderError)parts.push('Something went wrong drawing the page: '+TD.renderError+'. Please send this message to get it fixed.');
-    const n=TD.queue.reduce((x,j)=>x+j.cmds.length,0);
-    if(n)parts.push(n+(n===1?' change':' changes')+' waiting to reach Todoist'+(TD.sendError==='offline'?': Todoist can\u2019t be reached, trying again every minute.':TD.sendError==='busy'?': Todoist asked to slow down, trying again in a minute.':TD.sendError==='auth'?': Todoist didn\u2019t accept the token. Open the logo menu \u2192 Accounts to replace it.':'\u2026'));
+    sendPill();
     s.hidden=!parts.length;s.innerHTML=parts.map(p=>'<span>'+esc(p)+'</span>').join('');return;
   }
   if(!loaded)parts.push('Loading your planner…');
