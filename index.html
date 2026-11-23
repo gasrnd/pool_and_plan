@@ -607,7 +607,7 @@ function tdStop(){TD.on=false;clearInterval(TD.timer);TD.timer=0}
 const tdUuid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'u'+Date.now().toString(36)+Math.random().toString(36).slice(2);
 const accOfKey=k=>{const i=String(k||'').indexOf('|');return i>0?+String(k).slice(0,i):null};
 const listOfKey=k=>{const i=String(k||'').indexOf('|');return i>0?String(k).slice(i+1):null};
-TD.queue=[];TD.dirty=new Map();TD.dirtyTimer=0;TD.sending=false;TD.sendError='';TD.layout={};TD.structs=[];TD.setTimers={};
+TD.queue=[];TD.tempMap={};TD.dirty=new Map();TD.dirtyTimer=0;TD.sending=false;TD.sendError='';TD.layout={};TD.structs=[];TD.setTimers={};
 const REFUSED={'restricted-move':'Tasks can’t be moved in or out of a restricted list.','no-target':'Pick a list for this task first.','title-caps':'List titles can’t be all capitals: capitals mark the board.','title-empty':'Give the list a name.','not-a-section':'This list can’t be renamed or deleted here; it is a whole Todoist project.','board-not-caps':'Board names are written in capitals.','no-pool-project':'There is no POOL project in Todoist to put the list in.','some-lists-live-elsewhere':'Lists from other projects or accounts keep their names.'};
 const refusedMsg=c=>REFUSED[c]||'Todoist can’t do that change.';
 function tdAccOfTask(id,t){
@@ -677,6 +677,7 @@ async function tdFlushQueue(){
     while(TD.queue.length){
       const job=TD.queue[0],acc=TD.accounts[job.ai];
       if(!acc){TD.queue.shift();continue}
+      job.cmds.forEach(c=>{const a=c.args;if(a)['id','item_id','parent_id','section_id','project_id'].forEach(k=>{if(a[k]&&TD.tempMap[a[k]])a[k]=TD.tempMap[a[k]]})});
       const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items','reminders'])});
       let r;
       try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
@@ -688,6 +689,7 @@ async function tdFlushQueue(){
       const j=await r.json();
       const bad=Object.values(j.sync_status||{}).filter(x=>x!=='ok');
       if(bad.length)toast('Todoist didn’t accept a change: '+((bad[0]&&(bad[0].error||bad[0].error_tag))||'unknown reason')+'.');
+      if(j.temp_id_mapping){Object.assign(TD.tempMap,j.temp_id_mapping);const ids=TD.settings&&TD.settings.ids;if(ids)Object.keys(ids).forEach(k=>{if(j.temp_id_mapping[ids[k]])ids[k]=j.temp_id_mapping[ids[k]]})}
       tdMerge(acc,j);acc.lastOk=Date.now();TD.lastOk=Date.now();TD.sendError='';
     }
   }finally{TD.sending=false;tdSaveQueue();if(changed&&!TD.dirty.size)tdBuild();else renderStrip()}
@@ -701,7 +703,9 @@ function tdSaveSetting(name,value,now){
     const ids=(TD.settings&&TD.settings.ids)||{},cmds=[];
     let sec=S.configSectionId;
     if(!sec){sec='cfg-'+tdUuid();cmds.push({type:'section_add',uuid:tdUuid(),temp_id:sec,args:{name:'NOTES Config',project_id:S.poolProjectId}})}
-    cmds.push(P.writeSetting(name,value,Object.assign({},S,{configSectionId:sec}),ids,tdUuid,'set-'+tdUuid()));
+    const tmp='set-'+tdUuid(),c=P.writeSetting(name,value,Object.assign({},S,{configSectionId:sec}),ids,tdUuid,tmp);cmds.push(c);
+    if(c.type==='item_add'){if(!TD.settings)TD.settings={values:{},ids:{}};TD.settings.ids[name]=tmp}
+    if(!S.configSectionId)S.configSectionId=sec;
     tdSend(0,cmds);
   },now?0:700);
 }

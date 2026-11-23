@@ -365,9 +365,13 @@
   const SETTINGS = ['Zones', 'Zone grid', 'Rules', 'Sorting', 'Layout', 'Order'];
 
   function readSettings(items, s) {
-    const out = {}, ids = {};
+    const out = {}, ids = {}, seen = {};
     (items || []).forEach(t => {
-      if (t.is_deleted || t.section_id !== s.configSectionId || !SETTINGS.includes(t.content)) return;
+      if (t.is_deleted || t.checked || t.section_id !== s.configSectionId || !SETTINGS.includes(t.content)) return;
+      // if a setting exists twice, the most recently changed one wins
+      const stamp = String(t.updated_at || t.added_at || '');
+      if (ids[t.content] && stamp < (seen[t.content] || '')) return;
+      seen[t.content] = stamp;
       ids[t.content] = t.id;
       try { out[t.content] = JSON.parse(t.description || 'null'); } catch (e) { out[t.content] = null; }
     });
