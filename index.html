@@ -108,6 +108,10 @@ body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-vi
 
 .plus,.bigplus,.plus:hover,.bigplus:hover{color:var(--dark)}
 .lane-h .mini{color:var(--dark);font-weight:500}
+.lane-h .resched{background:none;border:0;padding:0 2px;color:var(--mute);font-size:12px;cursor:pointer}
+.lane-h .resched:hover,.lane-h .resched[aria-expanded=true]{color:var(--ink);text-decoration:underline}
+.resched-pop{display:flex;flex-wrap:wrap;gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.resched-pop input{flex:1 1 9em;padding:2px 6px}
 .railrow #proj-sel{flex:0 1 9.5em;min-width:5em;font-size:15px;font-weight:700;color:var(--ink)}
 .railrow #sort-sel,.railrow .chk.sm,.menu summary{color:var(--dark)}
 .railrow #sort-sel,.menu summary{border-color:transparent;background:transparent}
@@ -1069,7 +1073,10 @@ function renderBoard(){
     const list=laneTasks(l,all);
     if(l.optional&&!list.length)return '';
     return '<div class="lane'+(l.id===tdy()?' is-today':'')+'" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'"><div class="lane-h'+(l.edit?' mv':'')+'">'+(l.type==='proj'&&l.id?'<span class="dot p'+l.color+'"></span>':'')+'<b>'+esc(l.name)+'</b>'+(l.tag?'<span class="ltag">'+esc(l.tag)+'</span>':'')+'<i>'+list.length+'</i>'+
+      (l.id==='late'?'<button class="resched" data-act="reschedOpen" aria-expanded="'+(st.resched?'true':'false')+'">Reschedule</button>':'')+
       (l.edit?'<button class="mini" data-act="editSection" data-id="'+l.id+'">Edit</button>':'')+(l.type==='proj'&&l.id?'<button class="mini" data-act="editList" data-id="'+l.id+'">Edit</button>':'')+'</div>'+
+      (l.id==='late'&&st.resched?'<div class="resched-pop" role="group" aria-label="Move all overdue tasks to">'+[['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['nextweek','Next week']].map(q=>'<button type="button" class="mini" data-act="reschedTo" data-d="'+q[0]+'">'+q[1]+'</button>').join('')+
+        '<input type="date" id="resched-date" aria-label="Pick a day" min="'+tdy()+'"></div>':'')+
       list.map(([id,t])=>cardHtml(id,t,all)).join('')+
       (l.id==='late'||l.id==='later'||st.proj==='@periodic'?'':st.addIn===l.type+'|'+l.id?'<form class="lane-add" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'" novalidate><input type="text" id="lane-add-input" placeholder="New task, Enter to add" aria-label="New task in this list" autocomplete="off"></form>':'<button class="plus" data-act="laneAdd" data-lane="'+esc(l.id)+'" data-ltype="'+l.type+'" aria-label="Add a task to this list" title="Add a task">+</button>')+'</div>';
   }).join('');
@@ -1669,6 +1676,8 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  reschedOpen:()=>{st.resched=!st.resched;render()},
+  reschedTo:b=>reschedAll(quickDay(b.dataset.d)),
   whenToggle:()=>{const p=$('#when-pop'),b=$('#f-when');if(!p)return;p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden));if(p.hidden)b.focus();else{const d=$('#f-day');if(d)d.focus()}},
   whenQuick:b=>{const d=$('#f-day'),k=b.dataset.d,dw=new Date().getDay();
     if(k==='none'){d.value='';$('#f-time').value='';const r=$('#f-rep');if(r)r.value=''}
@@ -1806,6 +1815,7 @@ $('#sort-sel').addEventListener('change',e=>{
   put('prefs',Object.assign({},pf,{sort:so}));
 });
 $('#flt-unsched').addEventListener('change',e=>{st.unsched=e.target.checked;render()});
+document.addEventListener('change',e=>{if(e.target.id==='resched-date'&&e.target.value)reschedAll(e.target.value)});
 $('#flt-done').addEventListener('change',e=>{st.showDone=e.target.checked;render()});
 
 /* ---------- mouse drag ---------- */
@@ -1909,6 +1919,19 @@ function dragMove(cx,cy){
     const a=Math.min(d.a,d.b),b=Math.max(d.a,d.b);preview(d.col,a,Math.max(SNAP,b-a),'');
   }
   autoScroll(cx,cy);
+}
+function quickDay(k){const dw=new Date().getDay();return ymd(addDays(new Date(),k==='today'?0:k==='tomorrow'?1:k==='weekend'?(6-dw+7)%7:((8-dw)%7||7)))}
+// Move every overdue task to one day, like Todoist's "Reschedule". Times are kept; deadlines are left alone.
+function reschedAll(day){
+  if(!day)return;const td=tdy();let n=0;
+  byKind('task').forEach(([id,t])=>{
+    if(isDone(t))return;
+    const mb=missedBlock(id);
+    if(mb){const e=sessionsOf(id).find(x=>x[1]===mb);if(e){put(e[0],Object.assign({},mb,{date:day}));n++}return}
+    if(t.day&&t.day<td){put(id,Object.assign({},t,{day:day}));n++}
+  });
+  st.resched=false;render();
+  toast(n?(n===1?'1 task':n+' tasks')+' moved to '+dateName(day)+'.':'Nothing to move.');
 }
 function dropOnLane(id,tg){
   const t=items.get(id);if(!t)return;const n=Object.assign({},t);
