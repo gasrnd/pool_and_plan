@@ -72,13 +72,18 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 .alert span{flex:1;min-width:0;overflow-wrap:anywhere}
 .alert button{background:transparent;border-color:currentColor;color:inherit;padding:2px 9px}
 
-#main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(250px,30%) minmax(0,1fr);gap:12px}
+#main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(220px,var(--sidew,30%)) 12px minmax(0,1fr);gap:0}
+#split{cursor:col-resize;position:relative;touch-action:none;outline:none}
+#split::before{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:2px;background:transparent;transition:background .15s}
+#split::after{content:"";position:absolute;top:50%;left:4px;width:4px;height:32px;margin-top:-16px;border-radius:3px;background:var(--line)}
+#split:hover::before,#split.drag::before,#split:focus-visible::before{background:color-mix(in srgb,var(--accent) 45%,var(--line))}
+#main:not(.plan) #split{display:none}
 #main.board{grid-template-columns:minmax(0,1fr)}
 #main.board #cal{display:none}
 #side{display:flex;flex-direction:column;gap:7px;min-height:0;min-width:0}
 .railrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .railrow select.sm{flex:1 1 0;width:auto;min-width:0;padding:3px 4px;font-size:12px}
-.railrow #sort-sel{flex:0 0 6.2em}
+.railrow #sort-sel{flex:0 1 auto;max-width:13em;min-width:6em}
 #proj-sel.bd,#proj-sel option.bd{color:var(--pc)}
 #proj-sel.vis,#proj-sel option.vis{color:var(--mute)}
 #proj-sel option{font-weight:600}
@@ -307,6 +312,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 .menu .pop button[hidden]{display:none}
 @media (max-width:560px){
   #main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,2fr) minmax(0,3fr)}
+  #split{display:none}
   #main.board{grid-template-rows:minmax(0,1fr)}
   .tools{margin-left:0}
   #main.zones #zones{grid-template-columns:minmax(0,1fr)}
@@ -356,6 +362,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
     </div>
     <div id="board"></div>
   </section>
+  <div id="split" role="separator" aria-orientation="vertical" aria-label="Resize board and calendar" tabindex="0" title="Drag to resize. Double-click to reset."></div>
   <section id="cal" aria-label="Calendar"></section>
   <section id="zones" aria-label="Weekly routine"></section>
 </main>
@@ -548,7 +555,7 @@ async function tdSync(full){
   }finally{TD.busy=false}
 }
 function tdBuild(){
-  try{tdBuildInner()}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
+  try{tdBuildInner();ntfySchedule()}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
 }
 function tdBuildInner(){TD.buildError='';
   const P=window.PPMap,m=new Map(),merged=new Map();TD.taskAcc=new Map();
@@ -580,10 +587,12 @@ function tdBuildInner(){TD.buildError='';
       const x=P.fromTodoist(t,S);if(x.view==='config'||x.view==='hidden')return;
       if(x.view==='inbox'&&ai>0)return;            // only the main account's Inbox is shown
       const list=x.listKey?S.listsByKey.get(x.listKey):null;
-      const task={kind:'task',title:x.title,notes:x.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
+      const rs=remSplit(x.notes);
+      const task={kind:'task',title:x.title,notes:rs.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
         projectId:list?'b:'+list.board:'',sectionId:list?ai+'|'+x.listKey:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted,acc:ai};
       if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;if(x.days>1)task.days=x.days}
       else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
+      if(rs.reminders)task.reminders=rs.reminders;
       m.set(t.id,task);TD.taskAcc.set(t.id,ai);
     });
     (a.raw.reminders||new Map()).forEach(r=>{
@@ -622,7 +631,7 @@ function tdTaskPair(id){
   const t=items.get(id),ai=tdAccOfTask(id,t),S=TD.structs[ai],acc=TD.accounts[ai],P=window.PPMap;
   const r=acc&&acc.raw.items.get(id),before=r?P.fromTodoist(r,S):null;
   if(!t)return {ai:ai,before:before,after:null};
-  const a=Object.assign({},before||{repeatEditable:true,repeatString:'',durDefault:false,days:1},{id:id,title:t.title,notes:t.notes||'',priority:t.priority||4,labels:t.labels||[],parentId:t.parentId||'',done:!!t.done,order:t.order});
+  const a=Object.assign({},before||{repeatEditable:true,repeatString:'',durDefault:false,days:1},{id:id,title:t.title,notes:Array.isArray(t.reminders)?remJoin(t.notes,t.reminders):(t.notes||''),priority:t.priority||4,labels:t.labels||[],parentId:t.parentId||'',done:!!t.done,order:t.order});
   let lk=listOfKey(t.sectionId);
   if(!lk&&t.projectId){const b=items.get(t.projectId);const first=b&&(b.sections||[]).find(x=>accOfKey(x.id)===ai);if(first)lk=listOfKey(first.id)}
   if(lk&&accOfKey(t.sectionId)!=null&&accOfKey(t.sectionId)!==ai)return {ai:ai,before:before,after:a,crossAccount:true};
@@ -648,8 +657,8 @@ function tdFlushDirty(){
     const t=items.get(id),acc=TD.accounts[pr.ai];
     if(t&&!t.done&&Array.isArray(t.reminders)&&acc){
       const had=[];(acc.raw.reminders||new Map()).forEach(x=>{if(x.item_id===id&&(x.type==='relative'||x.type==='absolute'))had.push(x)});
-      had.filter(x=>!t.reminders.some(y=>y.id===x.id)).forEach(x=>r.commands.push({type:'reminder_delete',uuid:tdUuid(),args:{id:x.id}}));
-      t.reminders.filter(y=>!y.id).forEach(y=>r.commands.push({type:'reminder_add',uuid:tdUuid(),temp_id:'rem-'+tdUuid(),args:y.min!=null?{item_id:id,type:'relative',minute_offset:y.min}:{item_id:id,type:'absolute',due:{date:y.at+':00'}}}));
+      // reminders now live in the description, so Todoist's own copies are removed and never fire
+      had.forEach(x=>r.commands.push({type:'reminder_delete',uuid:tdUuid(),args:{id:x.id}}));
     }
     if(r.commands.length){if(!byAcc.has(pr.ai))byAcc.set(pr.ai,[]);byAcc.get(pr.ai).push(...r.commands)}
     // manual order inside a list goes to Todoist
@@ -1027,7 +1036,7 @@ function renderRail(){
     ps.value=st.proj;
     const cur=items.get(st.proj);ps.className='sm'+(cur&&cur.kind==='project'?' bd p'+(cur.color||0):special()&&/@periodic|@labels/.test(st.proj)?' vis':'');
   }
-  const so=$('#sort-sel');if(document.activeElement!==so)so.innerHTML='<option value="" selected disabled hidden>Sorting</option>'+[['manual','Manual order'],['primanual','Priority + manual'],['timepri','Time + priority + manual'],['priority','By priority']].map(o=>'<option value="'+o[0]+'">'+(st.sort===o[0]?'\u2713 ':'')+o[1]+'</option>').join('');
+  const so=$('#sort-sel');if(document.activeElement!==so){so.innerHTML=[['manual','Manual order'],['primanual','Priority + manual'],['timepri','Time + priority + manual'],['priority','By priority']].map(o=>'<option value="'+o[0]+'"'+(st.sort===o[0]?' selected':'')+'>'+o[1]+'</option>').join('');so.value=st.sort;so.title='Sorting for this board'}
   $('#flt-unsched').checked=st.unsched;$('#flt-done').checked=st.showDone;
 }
 function lanesDef(){
@@ -1157,12 +1166,12 @@ function renderCal(){
     const a=Math.max(0,diffDays(keys[0],e.date)),b=Math.min(days.length-1,diffDays(keys[0],e.end||e.date));
     ad+='<div class="chip ev" data-id="'+id+'" data-date="'+e.date+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+fmt(e.title)+'</div>';
   });
-  byKind('task').forEach(([id,t])=>{
+  if(!TD.on)byKind('task').forEach(([id,t])=>{
     if(!t.day||isDone(t)||(t.parentId&&items.has(t.parentId))||t.day>keys[keys.length-1]||lastDay(t)<keys[0])return;
     if(sessions.some(e=>e[1].taskId===id&&occursOn(e[1],t.day)))return;
     const a=Math.max(0,diffDays(keys[0],t.day)),b=Math.min(keys.length-1,diffDays(keys[0],lastDay(t))),p=projOf(t);
     ad+='<div class="chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+'" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+fmt(t.title)+((t.days||1)>1?' \u00b7 '+t.days+' days':'')+'</div>'});
-  byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.deadline);if(i>=0&&!isDone(t))ad+='<div class="chip dl" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">Due: '+fmt(t.title)+'</div>'});
+  if(!TD.on)byKind('task').forEach(([id,t])=>{const i=keys.indexOf(t.deadline);if(i>=0&&!isDone(t))ad+='<div class="chip dl" data-task="'+id+'" tabindex="0" role="button" style="grid-column:'+(i+2)+'">Due: '+fmt(t.title)+'</div>'});
   let gut='';for(let h=7;h<23;h++)gut+='<span style="top:'+((h-6)*H)+'px">'+pad(h)+':00</span>';
   const body=days.map((d,di)=>{
     const k=keys[di],w=wd(d);
@@ -1222,7 +1231,7 @@ function renderAlerts(){
 /* ---------- Notifications: alerts go to the phone through ntfy (the watch mirrors the phone), optionally a pop-up here ----------
    Settings are kept in this browser only. Only the alert text is sent, never task data. */
 const NKEY='poolplan.notify';
-const nDefaults=()=>({server:'https://ntfy.sh',topic:'',desktop:false});
+const nDefaults=()=>({server:'https://ntfy.sh',topic:'',desktop:false,names:true});
 function nGet(){try{return Object.assign(nDefaults(),JSON.parse(localStorage.getItem(NKEY)||'{}'))}catch(e){return nDefaults()}}
 function nSet(o){try{localStorage.setItem(NKEY,JSON.stringify(o))}catch(e){}}
 function nTopic(){const a=new Uint8Array(16);crypto.getRandomValues(a);return 'poolplan-'+[...a].map(x=>(x%36).toString(36)).join('')}
@@ -1237,19 +1246,23 @@ async function notify(title,message,o){
 }
 function openNotify(){
   const c=nGet(),topic=c.topic||nTopic(),dsk='Notification' in window;
-  const body='<div class="hint">Alerts go to your phone through the free <b>ntfy</b> app, and your watch shows them like any other phone notification. Only the alert text is sent, never your tasks.</div>'+
+  const nat=TD.on?tdNativeReminders():0;
+  const body='<div class="hint">Alerts go to your phone through the free <b>ntfy</b> app, and your watch shows them like any other phone notification: pomodoro breaks and task reminders. Task reminders are kept in the task\u2019s description in Todoist (a last line starting with \u23F0), so Todoist itself never fires them. Pool & Plan schedules them up to 3 days ahead whenever it is open.</div>'+
     '<h3>Phone</h3><ol class="steps"><li>Install <b>ntfy</b> on your phone.</li><li>In ntfy, tap + and subscribe to the channel below.</li><li>In the Garmin Connect app, allow notifications from ntfy.</li></ol>'+
     '<div class="row"><label class="fld"><span>Channel</span><input type="text" name="topic" id="n-topic" value="'+esc(topic)+'" autocomplete="off" spellcheck="false"></label>'+
     '<button type="button" data-act="nCopy">Copy</button><button type="button" data-act="nNew">New</button></div>'+
     '<div class="hint">Whoever knows this name can read its alerts, so keep it long and random.</div>'+
     '<div class="row"><button type="button" data-act="nTest" id="n-test">Send a test</button><span id="n-res" class="hint" role="status"></span></div>'+
     '<details><summary class="hint">Use my own ntfy server</summary><label class="fld"><span>Server</span><input type="text" name="server" id="n-server" value="'+esc(c.server)+'" autocomplete="off"></label></details>'+
+    '<label class="chkrow"><input type="checkbox" name="names" id="n-names"'+(c.names!==false?' checked':'')+'> Show the task name in reminders</label>'+
+    '<div class="hint">Alerts pass through the ntfy server. Untick this to send only the time, without the task name.</div>'+
+    (nat?'<h3>Todoist reminders</h3><div class="li"><span>'+nat+(nat===1?' reminder is':' reminders are')+' still set in Todoist itself. Move them here so they come through ntfy and Todoist stops firing them.</span><button type="button" data-act="nMigrate" id="n-migrate">Move them</button></div>':'')+
     (dsk?'<h3>This computer</h3><label class="chkrow"><input type="checkbox" name="desktop" id="n-desktop"'+(c.desktop?' checked':'')+'> Also show a pop-up here</label>':'');
   openDlg('Notifications',body,fd=>{
-    const o={server:String(fd.get('server')||'').trim()||'https://ntfy.sh',topic:String(fd.get('topic')||'').trim(),desktop:fd.get('desktop')==='on'};
+    const o={server:String(fd.get('server')||'').trim()||'https://ntfy.sh',topic:String(fd.get('topic')||'').trim(),desktop:fd.get('desktop')==='on',names:fd.get('names')==='on'};
     nSet(o);
     if(o.desktop&&Notification.permission!=='granted')Notification.requestPermission().then(p=>{if(p!=='granted'){o.desktop=false;nSet(o);toast('The browser didn’t allow pop-ups. Phone alerts still work.')}});
-    toast(o.topic?'Notifications saved.':'Phone alerts are off.');pomoRender();
+    toast(o.topic?'Notifications saved.':'Phone alerts are off.');pomoRender();ntfySchedule();
   });
 }
 const nFormCfg=()=>({server:(($('#n-server')||{}).value||'').trim()||'https://ntfy.sh',topic:(($('#n-topic')||{}).value||'').trim(),desktop:false});
@@ -1347,6 +1360,97 @@ function openPomo(){
 setInterval(()=>{try{pomoTick()}catch(e){}},20000);
 window.addEventListener('storage',e=>{if(e.key===PRUN||e.key===PKEY)pomoRender()});
 setTimeout(()=>pomoStart(false),0);
+
+
+/* ---------- Task reminders live in the task's description in Todoist, as a last line like "⏰ 10m, 1h, 2026-11-25 09:00".
+   Todoist therefore never fires them; Pool & Plan schedules them with ntfy (up to 3 days ahead). */
+function remEncode(list){
+  const seen=new Set();
+  return (list||[]).map(x=>x.at?x.at.replace('T',' '):x.min&&x.min%1440===0?(x.min/1440)+'d':x.min&&x.min%60===0?(x.min/60)+'h':(x.min||0)+'m')
+    .filter(s=>!seen.has(s)&&seen.add(s)).join(', ');
+}
+function remSplit(desc){
+  const s=String(desc||''),lines=s.split('\n');let i=lines.length-1;while(i>=0&&!lines[i].trim())i--;
+  const m=i>=0&&lines[i].trim().match(/^\u23F0\uFE0F?\s*(.*)$/);
+  if(!m)return {notes:s,reminders:null};
+  const out=[];
+  m[1].split(',').forEach(tok=>{tok=tok.trim();let k;
+    if((k=tok.match(/^(\d+)\s*(m|min|h|d)$/i)))out.push({min:Number(k[1])*(/^h/i.test(k[2])?60:/^d/i.test(k[2])?1440:1)});
+    else if((k=tok.match(/^(\d{4}-\d\d-\d\d)[ T](\d\d:\d\d)$/)))out.push({at:k[1]+'T'+k[2]});
+  });
+  return {notes:lines.slice(0,i).join('\n').replace(/\s+$/,''),reminders:out};
+}
+function remJoin(notes,list){
+  const code=remEncode(list);if(!code)return String(notes||'');
+  const n=String(notes||'').replace(/\s+$/,'');return (n?n+'\n\n':'')+'\u23F0 '+code;
+}
+const plainText=s=>String(s||'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/\*\*|__|~~|`/g,'').replace(/(^|\s)\*(\S[^*]*)\*/g,'$1$2');
+// Every reminder that should fire within ntfy's 3-day window
+function remFireTimes(){
+  const out=[],now=Date.now(),max=now+3*864e5-120000;
+  byKind('task').forEach(([id,t])=>{
+    if(isDone(t)||!Array.isArray(t.reminders)||!t.reminders.length)return;
+    const ses=items.get('s:'+id),seen=new Set();
+    t.reminders.forEach(r=>{
+      const key=r.at?'a'+r.at.replace(/\D/g,''):'m'+r.min;if(seen.has(key))return;seen.add(key);
+      let at;
+      if(r.at)at=pdate(r.at.slice(0,10)).getTime()+toMin(r.at.slice(11,16))*60000;
+      else{if(!ses)return;at=pdate(ses.date).getTime()+(ses.start-r.min)*60000}
+      if(at<=now+15000||at>max)return;
+      out.push({seq:('pp-'+id+'-'+key).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64),at:at,title:plainText(t.title),start:ses&&r.min!=null?hm(ses.start):''});
+    });
+  });
+  return out;
+}
+const NSKEY='poolplan.ntfy.sched';let schedTimer=0,schedBusy=false;
+function ntfySchedule(){clearTimeout(schedTimer);schedTimer=setTimeout(ntfyScheduleNow,1500)}
+async function ntfyScheduleNow(){
+  const c=nGet();if(!TD.on||!loaded||!c.topic||schedBusy)return;schedBusy=true;
+  try{
+    let old={};try{old=JSON.parse(localStorage.getItem(NSKEY)||'{}')||{}}catch(e){}
+    if(old.__topic!==c.topic)old={__topic:c.topic};
+    const base=String(c.server||'https://ntfy.sh').replace(/\/+$/,''),now=Date.now(),next={__topic:c.topic};
+    for(const w of remFireTimes()){
+      const title=c.names===false?'Reminder':w.title,message=c.names===false?(w.start?'A task starts at '+w.start+'.':'You have a task reminder.'):(w.start?'Starts at '+w.start:'Reminder');
+      const sig=w.at+'|'+title+'|'+message;
+      if(old[w.seq]&&old[w.seq].sig===sig){next[w.seq]=old[w.seq];continue}
+      try{const r=await fetch(base+'/',{method:'POST',body:JSON.stringify({topic:c.topic,title:title,message:message,tags:['alarm_clock'],priority:4,delay:String(Math.floor(w.at/1000)),sequence_id:w.seq})});
+        if(r.ok)next[w.seq]={at:w.at,sig:sig}}catch(e){}
+    }
+    for(const k of Object.keys(old)){
+      if(k==='__topic'||next[k])continue;const o=old[k];
+      if(o&&o.at>now){try{await fetch(base+'/'+encodeURIComponent(c.topic)+'/'+encodeURIComponent(k)+'/delete',{mode:'no-cors'})}catch(e){next[k]=o}}
+    }
+    try{localStorage.setItem(NSKEY,JSON.stringify(next))}catch(e){}
+  }finally{schedBusy=false}
+}
+// Todoist's own reminders still on tasks, from before reminders moved into the description
+function tdNativeReminders(){let n=0;TD.accounts.forEach(a=>(a.raw.reminders||new Map()).forEach(r=>{if((r.type==='relative'||r.type==='absolute')&&!r.is_deleted&&items.has(r.item_id))n++}));return n}
+function tdMigrateReminders(){
+  let n=0;TD.accounts.forEach(a=>(a.raw.reminders||new Map()).forEach(r=>{if((r.type==='relative'||r.type==='absolute')&&items.has(r.item_id)){tdMarkDirty(r.item_id);n++}}));
+  return n;
+}
+
+/* ---------- board / calendar divider: dragged by hand, remembered for each screen size ---------- */
+const SPKEY='poolplan.split',spScreen=()=>(window.screen?screen.width+'x'+screen.height:'any');
+function spGet(){try{const o=JSON.parse(localStorage.getItem(SPKEY)||'{}')||{};return o[spScreen()]||null}catch(e){return null}}
+function spSave(f){try{const o=JSON.parse(localStorage.getItem(SPKEY)||'{}')||{};if(f==null)delete o[spScreen()];else o[spScreen()]=f;localStorage.setItem(SPKEY,JSON.stringify(o))}catch(e){}}
+function spApply(f){const m=$('#main');if(f==null)m.style.removeProperty('--sidew');else m.style.setProperty('--sidew',(f*100).toFixed(1)+'%');const h=$('#split');if(h)h.setAttribute('aria-valuenow',String(Math.round((f==null?.3:f)*100)))}
+(function(){
+  const h=$('#split'),m=$('#main');if(!h)return;
+  const clamp01=f=>Math.min(.75,Math.max(.15,f));
+  let drag=false;
+  h.addEventListener('pointerdown',e=>{if(e.button!==0)return;drag=true;h.setPointerCapture(e.pointerId);h.classList.add('drag');document.body.style.cursor='col-resize';e.preventDefault()});
+  h.addEventListener('pointermove',e=>{if(!drag)return;const r=m.getBoundingClientRect();spApply(clamp01((e.clientX-r.left)/r.width))});
+  const end=()=>{if(!drag)return;drag=false;h.classList.remove('drag');document.body.style.cursor='';const v=m.style.getPropertyValue('--sidew');if(v)spSave(parseFloat(v)/100)};
+  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);
+  h.addEventListener('dblclick',()=>{spSave(null);spApply(null)});
+  h.addEventListener('keydown',e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();const cur=spGet()||.3,f=clamp01(cur+(e.key==='ArrowLeft'?-.02:.02));spApply(f);spSave(f)});
+  h.setAttribute('aria-valuemin','15');h.setAttribute('aria-valuemax','75');
+  spApply(spGet());
+  // a different screen (another monitor) has its own setting
+  let lastScreen=spScreen();window.addEventListener('resize',()=>{if(spScreen()!==lastScreen){lastScreen=spScreen();spApply(spGet())}});
+})();
 
 /* ---------- mutations + rules ---------- */
 function nextOrder(){return byKind('task').reduce((m,e)=>Math.max(m,e[1].order||0),0)+1}
@@ -1578,7 +1682,8 @@ function remBox(){
       :'<select id="rem-sel" aria-label="Add a reminder"><option value="" selected disabled hidden>Add reminder</option>'+
         REM_REL.filter(r=>!cur.some(x=>x.min===r[0])).map(r=>'<option value="'+r[0]+'"'+(timed?'':' disabled')+'>'+r[1]+'</option>').join('')+
         '<option value="abs">At a date and time…</option></select>')+
-    (timed?'':'<span class="hint">Reminders before the start need a time.</span>');
+    (timed?'':'<span class="hint">Reminders before the start need a time.</span>')+
+    (TD.on&&!nGet().topic&&cur.length?'<span class="hint">Reminders reach you through ntfy. <button type="button" class="mini" data-act="openNotify">Set it up</button></span>':'');
 }
 function whenUpdate(){
   const b=$('#f-when');if(!b)return;
@@ -1842,6 +1947,7 @@ const ACT={
   pomoAllow:()=>{pomoStart(true).then(()=>{if(dlg.open)openPomo()})},
   pomoReset:()=>{runSet({start:Date.now(),alerted:0});pomoRender();openPomo()},
   openNotify:()=>openNotify(),
+  nMigrate:b=>{const n=tdMigrateReminders();b.disabled=true;b.textContent='Moving\u2026';toast(n?'Moving '+n+(n===1?' reminder':' reminders')+' out of Todoist.':'Nothing to move.')},
   nNew:()=>{const i=$('#n-topic');if(i)i.value=nTopic()},
   nCopy:()=>{const i=$('#n-topic');if(!i)return;const t=i.value;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Channel name copied.'),()=>{i.focus();i.select()})},
   nTest:()=>{const res=$('#n-res'),cfg=nFormCfg();if(!cfg.topic){res.textContent='Add a channel first.';return}res.textContent='Sending\u2026';
@@ -2056,7 +2162,7 @@ function dragMove(cx,cy){
     let g=$('.ghost');
     if(!g){g=d.el.cloneNode(true);g.classList.add('ghost');g.style.width=d.el.offsetWidth+'px';document.body.appendChild(g);d.el.style.opacity='.35'}
     g.style.left=(e.clientX+8)+'px';g.style.top=(e.clientY+8)+'px';
-    const lane=under&&under.closest('.lane'),c=under&&under.closest('.daycol'),mc=under&&under.closest('.mcell'),adr=under&&under.closest('.allday');
+    const lane=under&&under.closest('.lane'),c=under&&under.closest('.daycol'),mc=under&&under.closest('.mcell'),adr=TD.on?null:under&&under.closest('.allday');
     document.querySelectorAll('.drop').forEach(l=>l.classList.remove('drop'));
     d.target=null;const p=$('#pv'),t=items.get(d.id),dur=(t&&t.est)||60;let ins=$('#ins');if(ins&&!lane){ins.remove();ins=null}
     if(c){const start=clamp(snap(minAt(c,e.clientY)),S0,Math.max(S0,E0-dur));preview(c,start,dur,t&&t.title);d.target={date:c.dataset.date,start:start,dur:dur}}
