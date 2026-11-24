@@ -587,11 +587,6 @@ function tdBuildInner(){TD.buildError='';
       if(rs.reminders)task.reminders=rs.reminders;
       m.set(t.id,task);TD.taskAcc.set(t.id,ai);
     });
-    (a.raw.reminders||new Map()).forEach(r=>{
-      const t=m.get(r.item_id);if(!t||t.kind!=='task'||TD.taskAcc.get(r.item_id)!==ai)return;
-      const x=r.type==='relative'&&r.minute_offset!=null?{id:r.id,min:r.minute_offset}:r.type==='absolute'&&r.due&&r.due.date?{id:r.id,at:String(r.due.date).slice(0,16)}:null;
-      if(x)(t.reminders=t.reminders||[]).push(x);
-    });
   });
   m.forEach((x,k)=>{if(x.kind!=='session')return;const t=m.get(x.taskId),rel=((t&&t.reminders)||[]).filter(r=>r.min!=null).map(r=>r.min);x.remind=rel.length?Math.min(...rel):-1});
   (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
@@ -1238,7 +1233,6 @@ async function notify(title,message,o){
 }
 function openNotify(){
   const c=nGet(),topic=c.topic||nTopic(),dsk='Notification' in window;
-  const nat=TD.on?tdNativeReminders():0;
   const body='<div class="hint">Alerts go to your phone through the free <b>ntfy</b> app, and your watch shows them like any other phone notification: pomodoro breaks and task reminders. Task reminders are kept in the task\u2019s description in Todoist (a last line starting with \u23F0), so Todoist itself never fires them. Pool & Plan schedules them up to 3 days ahead whenever it is open.</div>'+
     '<h3>Phone</h3><ol class="steps"><li>Install <b>ntfy</b> on your phone.</li><li>In ntfy, tap + and subscribe to the channel below.</li><li>In the Garmin Connect app, allow notifications from ntfy.</li></ol>'+
     '<div class="row"><label class="fld"><span>Channel</span><input type="text" name="topic" id="n-topic" value="'+esc(topic)+'" autocomplete="off" spellcheck="false"></label>'+
@@ -1248,7 +1242,6 @@ function openNotify(){
     '<details><summary class="hint">Use my own ntfy server</summary><label class="fld"><span>Server</span><input type="text" name="server" id="n-server" value="'+esc(c.server)+'" autocomplete="off"></label></details>'+
     '<label class="chkrow"><input type="checkbox" name="names" id="n-names"'+(c.names!==false?' checked':'')+'> Show the task name in reminders</label>'+
     '<div class="hint">Alerts pass through the ntfy server. Untick this to send only the time, without the task name.</div>'+
-    (nat?'<h3>Todoist reminders</h3><div class="li"><span>'+nat+(nat===1?' reminder is':' reminders are')+' still set in Todoist itself. Move them here so they come through ntfy and Todoist stops firing them.</span><button type="button" data-act="nMigrate" id="n-migrate">Move them</button></div>':'')+
     (dsk?'<h3>This computer</h3><label class="chkrow"><input type="checkbox" name="desktop" id="n-desktop"'+(c.desktop?' checked':'')+'> Also show a pop-up here</label>':'');
   openDlg('Notifications',body,fd=>{
     const o={server:String(fd.get('server')||'').trim()||'https://ntfy.sh',topic:String(fd.get('topic')||'').trim(),desktop:fd.get('desktop')==='on',names:fd.get('names')==='on'};
@@ -1415,12 +1408,6 @@ async function ntfyScheduleNow(){
     }
     try{localStorage.setItem(NSKEY,JSON.stringify(next))}catch(e){}
   }finally{schedBusy=false}
-}
-// Todoist's own reminders still on tasks, from before reminders moved into the description
-function tdNativeReminders(){let n=0;TD.accounts.forEach(a=>(a.raw.reminders||new Map()).forEach(r=>{if((r.type==='relative'||r.type==='absolute')&&!r.is_deleted&&items.has(r.item_id))n++}));return n}
-function tdMigrateReminders(){
-  let n=0;TD.accounts.forEach(a=>(a.raw.reminders||new Map()).forEach(r=>{if((r.type==='relative'||r.type==='absolute')&&items.has(r.item_id)){tdMarkDirty(r.item_id);n++}}));
-  return n;
 }
 
 /* ---------- board / calendar divider: dragged by hand, remembered for each screen size ---------- */
@@ -1939,7 +1926,6 @@ const ACT={
   pomoAllow:()=>{pomoStart(true).then(()=>{if(dlg.open)openPomo()})},
   pomoReset:()=>{runSet({start:Date.now(),alerted:0});pomoRender();openPomo()},
   openNotify:()=>openNotify(),
-  nMigrate:b=>{const n=tdMigrateReminders();b.disabled=true;b.textContent='Moving\u2026';toast(n?'Moving '+n+(n===1?' reminder':' reminders')+' out of Todoist.':'Nothing to move.')},
   nNew:()=>{const i=$('#n-topic');if(i)i.value=nTopic()},
   nCopy:()=>{const i=$('#n-topic');if(!i)return;const t=i.value;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Channel name copied.'),()=>{i.focus();i.select()})},
   nTest:()=>{const res=$('#n-res'),cfg=nFormCfg();if(!cfg.topic){res.textContent='Add a channel first.';return}res.textContent='Sending\u2026';
