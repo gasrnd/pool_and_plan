@@ -1576,7 +1576,7 @@ function durTok(t){
   let m=/^(\d+(?:\.\d+)?)h(?:(\d+)m?)?$/i.exec(t);if(m)return Math.round(+m[1]*60)+(+m[2]||0);
   m=/^(\d+)m(?:in)?$/i.exec(t);return m?+m[1]:null;
 }
-function parseQuick(text){
+function parseQuick(text,baseDay){
   const tk=String(text).trim().split(/\s+/).filter(Boolean),q={labels:[],title:''},rest=[];
   for(let i=0;i<tk.length;i++){
     const w=tk[i],lw=w.toLowerCase(),nx=tk[i+1];let v;
@@ -1605,10 +1605,10 @@ function parseQuick(text){
   q.title=rest.join(' ');
   if(q.repeat){
     if(q.repeat.freq==='weekly'&&q.repeat.days&&!q.date)q.date=q.repeat.days.map(d=>nextWd(d,true)).sort()[0];
-    if(!q.date)q.date=tdy();
+    if(!q.date)q.date=baseDay||tdy();
     if(q.repeat.freq==='weekly'&&!q.repeat.days)q.repeat.days=[wd(pdate(q.date))];
   }
-  if(q.time!=null){if(!q.date)q.date=tdy()}
+  if(q.time!=null){if(!q.date)q.date=baseDay||tdy()}
   else if(q.date)q.day=q.date;
   return q;
 }
@@ -1620,7 +1620,7 @@ function lanePreset(type,id){
 }
 function quickAdd(text,pre){
   pre=pre||{};
-  const q=parseQuick(text);
+  const q=parseQuick(text,pre.day||'');
   if(!q.title){toast('Give the task a name.');return false}
   let pid=pre.projectId!=null?pre.projectId:curPid(),sid=pre.sectionId||'';
   if(q.project){sid='';
