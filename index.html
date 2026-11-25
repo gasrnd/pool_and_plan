@@ -75,6 +75,15 @@ button.pomo.due::after{background:var(--accent)}
 button.pomo.away{opacity:.6}
 button.pomo.off{font-style:italic}
 .chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+.done-bar{display:flex;gap:8px;align-items:center}.done-bar #done-q{flex:1 1 auto;min-width:0}.done-bar select{flex:0 0 auto;width:auto}
+.done-list{display:flex;flex-direction:column;gap:2px;max-height:62vh;overflow:auto;margin-top:6px}
+#dform h3.done-day{margin:12px 0 0;font-size:12px;font-weight:600;color:var(--mute);text-transform:none;letter-spacing:0}
+.done-row{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.done-ck{flex:0 0 18px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:var(--surface);background:color-mix(in srgb,var(--mute) 70%,transparent)}
+.done-t{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.done-t>span{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--mute) 60%,transparent);color:color-mix(in srgb,var(--ink) 75%,var(--mute))}
+.done-t small{color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.done-more{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 2px}
 ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;color:var(--ink)}
 #sendpill{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:50;max-width:min(360px,calc(100vw - 28px));font-size:12px;color:var(--mute);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;box-shadow:0 4px 14px rgba(10,14,20,.10);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none}
 #sendpill.on{opacity:1;transform:none}
@@ -336,7 +345,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <body>
 
 <header class="top">
-  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button><button type="button" data-act="pomoOpen" id="m-pomo">Pomodoros</button><button type="button" data-act="openNotify" id="m-notify">Notifications</button></div></details>
+  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button><button type="button" data-act="openCompleted" id="m-done">Completed</button><button type="button" data-act="pomoOpen" id="m-pomo">Pomodoros</button><button type="button" data-act="openNotify" id="m-notify">Notifications</button></div></details>
   <div class="tabs">
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
@@ -1685,6 +1694,76 @@ form.addEventListener('click',e=>{if(e.target.closest('#f-nview')&&!e.target.clo
 form.addEventListener('keydown',e=>{if(e.target.id==='f-nview'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();notesEdit()}});
 form.addEventListener('focusout',e=>{if(e.target.id!=='f-notes')return;const v=$('#f-nview'),ta=e.target;if(!v)return;v.innerHTML=ta.value.trim()?fmtBlock(ta.value):'<span class="hint">Description</span>';ta.hidden=true;v.hidden=false});
 form.addEventListener('input',e=>{if(e.target.type==='time')syncForm()});
+
+/* ---------- Completed tasks: fetched from Todoist on demand (the normal sync leaves them out), 30 days at a time ---------- */
+const DONE={rows:[],until:0,loading:false,err:'',q:'',board:''};
+async function doneFetch(acc,since,until){
+  const out=[];let cursor='',pages=0;
+  do{
+    const u=new URL('https://api.todoist.com/api/v1/tasks/completed/by_completion_date');
+    u.searchParams.set('since',since.toISOString().replace(/\.\d+Z$/,'Z'));u.searchParams.set('until',until.toISOString().replace(/\.\d+Z$/,'Z'));
+    u.searchParams.set('limit','200');if(cursor)u.searchParams.set('cursor',cursor);
+    const r=await fetch(u,{headers:{Authorization:'Bearer '+acc.token}});
+    if(!r.ok)throw new Error('Todoist answered '+r.status);
+    const j=await r.json();out.push(...(j.items||[]));cursor=j.next_cursor||'';
+  }while(cursor&&++pages<20);
+  return out;
+}
+async function doneLoadMore(){
+  if(DONE.loading)return;DONE.loading=true;DONE.err='';doneRender();
+  const until=new Date(DONE.until||Date.now()),since=new Date(until.getTime()-30*864e5);
+  try{
+    if(TD.on){
+      for(let ai=0;ai<TD.accounts.length;ai++){
+        const acc=TD.accounts[ai],S=TD.structs[ai];
+        (await doneFetch(acc,since,until)).forEach(t=>{
+          let where='Inbox';
+          try{const f=window.PPMap.fromTodoist(t,S),l=f.listKey&&S.listsByKey.get(f.listKey);where=f.board?(f.board+(l?' / '+(l.title||l.name||''):'')):(f.view==='inbox'?'Inbox':'Other')}catch(e){}
+          const parent=t.parent_id&&(items.get(t.parent_id)||null);
+          DONE.rows.push({id:t.id,ai:ai,title:t.content||'',at:t.completed_at||'',where:where,parent:parent?parent.title:'',repeat:!!(t.due&&t.due.is_recurring)});
+        });
+      }
+    }else{
+      byKind('task').filter(e=>e[1].done).forEach(([id,t])=>{
+        const b=items.get(pidOf(t)),sec=b&&(b.sections||[]).find(x=>x.id===t.sectionId);
+        DONE.rows.push({id:id,ai:-1,title:t.title,at:t.doneAt?new Date(t.doneAt).toISOString():'',where:b?b.name+(sec?' / '+sec.name:''):'Inbox',parent:''});
+      });
+      DONE.until=-1;
+    }
+    if(DONE.until!==-1)DONE.until=since.getTime();
+  }catch(e){DONE.err=String((e&&e.message)||e)}
+  // the same task can come back twice (several accounts, page edges)
+  const seen=new Set();DONE.rows=DONE.rows.filter(r=>{const k=r.ai+'|'+r.id+'|'+r.at;if(seen.has(k))return false;seen.add(k);return true})
+    .sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  DONE.loading=false;doneRender();
+}
+function doneRender(){
+  const box=$('#done-list');if(!box)return;
+  const words=fold(DONE.q).split(/\s+/).filter(Boolean);
+  const rows=DONE.rows.filter(r=>(!DONE.board||r.where.split(' / ')[0]===DONE.board)&&words.every(w=>fold(plainText(r.title)+' '+r.where).includes(w)));
+  let html='',lastDay='';
+  rows.forEach(r=>{
+    const d=r.at?new Date(r.at):null,day=d?ymd(d):'';
+    if(day!==lastDay){html+='<h3 class="done-day">'+(day?esc(dateName(day)):'Earlier')+'</h3>';lastDay=day}
+    html+='<div class="done-row"><span class="done-ck" aria-hidden="true">✓</span><span class="done-t"><span>'+fmt(r.title,true)+'</span><small>'+esc(r.where)+(r.parent?' · sub-task of '+esc(plainText(r.parent)):'')+(d?' · '+hm(d.getHours()*60+d.getMinutes()):'')+'</small></span>'+
+      (r.ai>=0?'<button type="button" class="mini" data-act="doneReopen" data-id="'+esc(r.id)+'" data-ai="'+r.ai+'">Reopen</button>':'')+'</div>';
+  });
+  const span=DONE.until>0?Math.round((Date.now()-DONE.until)/864e5):0;
+  box.innerHTML=(html||(DONE.loading?'':'<div class="hint">'+(DONE.rows.length?'Nothing matches.':'No completed tasks in this period.')+'</div>'))+
+    (DONE.err?'<div class="hint">Couldn’t load completed tasks: '+esc(DONE.err)+'</div>':'')+
+    (DONE.loading?'<div class="hint">Loading…</div>':DONE.until>0?'<div class="done-more"><span class="hint">Showing the last '+span+' days.</span><button type="button" class="mini" data-act="doneMore">Show 30 more days</button></div>':'');
+}
+function openCompleted(){
+  Object.assign(DONE,{rows:[],until:0,loading:false,err:'',q:'',board:''});
+  const boards=byKind('project').sort(byOrder).map(e=>e[1].name);
+  openDlg('Completed','<div class="done-bar"><input type="search" id="done-q" placeholder="Filter" aria-label="Filter completed tasks" autocomplete="off">'+
+    '<select id="done-board" aria-label="Board"><option value="">All boards</option>'+boards.map(n=>'<option>'+esc(n)+'</option>').join('')+'<option value="Inbox">Inbox</option></select></div>'+
+    '<div id="done-list" class="done-list" aria-live="polite"></div>',null,{focus:false});
+  doneLoadMore();
+}
+form.addEventListener('input',e=>{if(e.target.id==='done-q'){DONE.q=e.target.value;doneRender()}});
+form.addEventListener('change',e=>{if(e.target.id==='done-board'){DONE.board=e.target.value;doneRender()}});
+
 form.addEventListener('submit',e=>{e.preventDefault();if(onSave&&onSave(new FormData(form))!==false)dlg.close()});
 dlg.addEventListener('close',()=>{curTask=null;reopen=null});
 
@@ -2000,6 +2079,10 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  openCompleted:()=>openCompleted(),
+  doneMore:()=>doneLoadMore(),
+  doneReopen:b=>{const ai=Number(b.dataset.ai),id=b.dataset.id;tdSend(ai,[{type:'item_uncomplete',uuid:tdUuid(),args:{id:id}}]);
+    DONE.rows=DONE.rows.filter(r=>!(r.ai===ai&&r.id===id));doneRender();toast('Reopened. It\u2019s back in its list.')},
   pomoOpen:()=>openPomo(),
   pomoClick:()=>{if(!POMO.det&&POMO.perm!=='denied')pomoStart(true);else openPomo()},
   pomoAllow:()=>{pomoStart(true).then(()=>{if(dlg.open)openPomo()})},
