@@ -172,9 +172,9 @@ a.lk:hover{text-decoration-thickness:2px}
 .sub .tk{width:14px;height:14px;font-size:9px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--pc);flex:none;display:inline-block}
 .p0{--pc:var(--mute)}.p1{--pc:var(--p1)}.p2{--pc:var(--p2)}.p3{--pc:var(--p3)}.p4{--pc:var(--p4)}.p5{--pc:var(--p5)}.p6{--pc:var(--p6)}.p7{--pc:var(--p7)}.p8{--pc:var(--p8)}.p9{--pc:var(--p9)}.p10{--pc:var(--p10)}.p11{--pc:var(--p11)}.p12{--pc:var(--p12)}
-.board #board.hz,#board.hz{display:grid;grid-auto-flow:column;grid-auto-columns:min(86%,var(--lwp,340px));align-items:start;overflow:auto;scroll-snap-type:x proximity}
+.board #board.hz,#board.hz{display:grid;grid-auto-flow:column;grid-auto-columns:min(86%,var(--lwp,340px));align-items:start;overflow:auto}
 #main.board #board.hz{grid-auto-columns:minmax(230px,1fr)}
-#board.hz .lane{scroll-snap-align:start}
+
 #board.hz .newlane{width:78px;justify-self:start}
 #board.hz .newlane:has(form){width:100%}
 .lane.is-today .lane-h b{color:var(--accent)}
