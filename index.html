@@ -52,6 +52,18 @@ input[type=text],input[type=password],input[type=date],input[type=time],select,t
 .nav{display:flex;align-items:center;gap:4px}
 #range{font-family:var(--f-display);font-weight:500;font-size:13px;margin-left:4px;font-variant-numeric:tabular-nums}
 .tools{display:flex;flex-wrap:nowrap;gap:6px;margin-left:auto;align-items:center}
+.search{position:relative}
+#q{width:11em;transition:width .15s;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:5px 9px;font:inherit;font-size:13px;color:var(--ink)}
+#q:focus{width:17em;outline:none;border-color:var(--accent)}
+#q-res{position:fixed;width:min(420px,calc(100vw - 24px));max-height:60vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(10,14,20,.14);z-index:60;padding:4px}
+.qr{display:flex;flex-direction:column;gap:1px;padding:6px 9px;border-radius:6px;cursor:pointer}
+.qr.on,.qr:hover{background:var(--sunk)}
+.qr .qt{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr.dn .qt{text-decoration:line-through;color:var(--mute)}
+.qr small{color:var(--mute);font-size:12px;display:flex;gap:6px;align-items:center;overflow:hidden;white-space:nowrap}
+.qr mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:2px}
+.qempty{padding:8px 10px;color:var(--mute);font-size:13px}
+@media (max-width:560px){#q{width:7em}#q:focus{width:12em}}
 body[data-view="board"] .nav,body[data-view="board"] #btn-new-event,body[data-view="board"] #span-tabs,body[data-view="zones"] .nav,body[data-view="zones"] #btn-new-event,body[data-view="zones"] #span-tabs{display:none}
 
 #strip{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:7px 12px;color:var(--mute)}
@@ -338,6 +350,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   </div>
   <div class="tools">
     <button data-act="pomoClick" id="pomo" class="pomo" hidden></button>
+    <div class="search" role="search"><input type="search" id="q" placeholder="Search" aria-label="Search tasks" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="q-res" aria-autocomplete="list"><div id="q-res" role="listbox" aria-label="Matching tasks" hidden></div></div>
     <button data-act="newTask" id="btn-new-task">New task</button>
     <button data-act="rules" id="btn-rules">Rules</button>
     <div class="tabs" id="span-tabs" aria-label="Calendar range">
@@ -1437,6 +1450,64 @@ function spApply(f){const m=$('#main');if(f==null)m.style.removeProperty('--side
   spApply(spGet());
   // a different screen (another monitor) has its own setting
   let lastScreen=spScreen();window.addEventListener('resize',()=>{if(spScreen()!==lastScreen){lastScreen=spScreen();spApply(spGet())}});
+})();
+
+/* ---------- search: finds tasks by name, description, label, board or list (accents ignored) ---------- */
+const fold=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const QS={sel:0,ids:[]};
+function searchTasks(q){
+  const words=fold(q).split(/\s+/).filter(Boolean);if(!words.length)return [];
+  const out=[];
+  byKind('task').forEach(([id,t])=>{
+    const b=items.get(pidOf(t)),sec=b&&(b.sections||[]).find(x=>x.id===t.sectionId);
+    const title=fold(plainText(t.title)),hay=title+' '+fold(t.notes)+' '+fold((t.labels||[]).join(' '))+' '+fold(b&&b.name)+' '+fold(sec&&sec.name);
+    if(!words.every(w=>hay.includes(w)))return;
+    const score=(isDone(t)?100:0)+(title.startsWith(words[0])?0:words.every(w=>title.includes(w))?1:2);
+    const ps=primarySes(id),day=ps?ps[1].date:(t.day||'');
+    out.push({id:id,t:t,score:score,day:day,time:ps?hm(ps[1].start):'',where:b?b.name+(sec?' / '+sec.name:''):'Inbox'});
+  });
+  return out.sort((a,b)=>a.score-b.score||(a.day||'9999').localeCompare(b.day||'9999')||fold(a.t.title).localeCompare(fold(b.t.title))).slice(0,40);
+}
+function markWords(text,q){
+  let h=esc(text);fold(q).split(/\s+/).filter(Boolean).forEach(w=>{
+    const f=fold(text),i=f.indexOf(w);if(i<0)return;
+    // only mark when folding kept the length, so positions match
+    if(f.length===text.length)h=h.replace(esc(text.slice(i,i+w.length)),'<mark>'+esc(text.slice(i,i+w.length))+'</mark>');
+  });return h;
+}
+function searchRender(){
+  const q=$('#q').value,box=$('#q-res');
+  if(!q.trim()){box.hidden=true;$('#q').setAttribute('aria-expanded','false');QS.ids=[];return}
+  const r=searchTasks(q);QS.ids=r.map(x=>x.id);QS.sel=Math.min(QS.sel,Math.max(0,r.length-1));
+  box.innerHTML=r.length?r.map((x,i)=>'<div class="qr'+(i===QS.sel?' on':'')+(isDone(x.t)?' dn':'')+'" role="option" id="qr-'+i+'" aria-selected="'+(i===QS.sel)+'" data-qid="'+esc(x.id)+'">'+
+      '<span class="qt">'+markWords(plainText(x.t.title),q)+'</span><small><span>'+esc(x.where)+'</span>'+(x.day?'<span class="'+dateClass(x.day)+'">'+esc(dateName(x.day)+(x.time?' '+x.time:''))+'</span>':'')+'</small></div>').join('')
+    :'<div class="qempty">No tasks match.</div>';
+  const rc=$('#q').getBoundingClientRect(),w=Math.min(420,innerWidth-24);
+  box.style.top=(rc.bottom+4)+'px';box.style.left=Math.max(12,Math.min(rc.right-w,innerWidth-w-12))+'px';box.style.width=w+'px';
+  box.hidden=false;$('#q').setAttribute('aria-expanded','true');
+  if(r.length)$('#q').setAttribute('aria-activedescendant','qr-'+QS.sel);else $('#q').removeAttribute('aria-activedescendant');
+}
+function searchOpen(id){const q=$('#q');q.value='';searchRender();q.blur();if(id)openTask(id)}
+(function(){
+  const q=$('#q'),box=$('#q-res');if(!q)return;
+  q.addEventListener('input',()=>{QS.sel=0;searchRender()});
+  q.addEventListener('transitionend',()=>{if(!box.hidden)searchRender()});
+  window.addEventListener('resize',()=>{if(!box.hidden)searchRender()});
+  q.addEventListener('focus',()=>{if(q.value.trim())searchRender()});
+  q.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!QS.ids.length)return;QS.sel=(QS.sel+(e.key==='ArrowDown'?1:QS.ids.length-1))%QS.ids.length;searchRender();const o=$('#qr-'+QS.sel);if(o)o.scrollIntoView({block:'nearest'})}
+    else if(e.key==='Enter'){e.preventDefault();if(QS.ids[QS.sel])searchOpen(QS.ids[QS.sel])}
+    else if(e.key==='Escape'){e.preventDefault();if(q.value){q.value='';searchRender()}else q.blur()}
+  });
+  box.addEventListener('mousedown',e=>e.preventDefault());   // keep focus in the box while clicking a result
+  box.addEventListener('click',e=>{const o=e.target.closest('.qr');if(o)searchOpen(o.dataset.qid)});
+  q.addEventListener('blur',()=>setTimeout(()=>{if(document.activeElement!==q){box.hidden=true;q.setAttribute('aria-expanded','false')}},120));
+  // "/" jumps to search, like in Todoist
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey)return;
+    const t=e.target;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))||dlg.open)return;
+    e.preventDefault();q.focus();q.select();
+  });
 })();
 
 /* ---------- mutations + rules ---------- */
