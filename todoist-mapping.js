@@ -332,7 +332,7 @@
       if (!proj) return { commands: [], refused: ['no-pool-project'] };
       const role = s.projectRole.get(proj);
       const name = role && role.kind === 'board' ? a.title : sectionName(a.board, a.title);
-      return { commands: [{ type: 'section_add', uuid: uuid(), temp_id: a.tempId, args: { name: name, project_id: proj } }], refused: [] };
+      return { commands: [{ type: 'section_add', uuid: uuid(), temp_id: a.tempId || uuid(), args: { name: name, project_id: proj } }], refused: [] };
     }
     const l = s.listsByKey.get(a.key);
     if (!l || !l.sectionId) return { commands: [], refused: ['not-a-section'] };

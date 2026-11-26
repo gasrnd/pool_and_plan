@@ -191,6 +191,8 @@ t('writing tasks', () => {
 t('lists and boards', () => {
   let r = M.listCommands('add', S, uuid, { board: 'ADMIN', title: 'Waiting', tempId: 'l1' });
   assert.deepStrictEqual(r.commands[0].args, { name: 'ADMIN Waiting', project_id: 'P1' });
+  r = M.listCommands('add', S, uuid, { board: 'ADMIN', title: 'Later' });
+  assert.ok(r.commands[0].temp_id, 'a new list always has a temporary id');
   r = M.listCommands('add', S, uuid, { board: 'ADMIN', title: 'WAITING' });
   assert.deepStrictEqual(r.commands[0].args, { name: 'ADMIN WAITING', project_id: 'P1' });
   r = M.listCommands('add', S, uuid, { board: 'Holidays', title: 'Flights', projectId: 'P4' });
