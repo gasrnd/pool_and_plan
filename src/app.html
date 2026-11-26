@@ -7,7 +7,7 @@
 :root{
   --bg:#E8EBF0; --surface:#F6F8FA; --sunk:#DCE1E8; --line:#CBD2DB; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
   --accent:#0B7A85; --accent-ink:#FFFFFF; --band:rgba(226,160,30,.20); --band-ink:#7A5200; --now:#D6364B;
-  --ev1:#8A4FD3; --ev2:#A08A2E; --ev3:#8A5A33; --ev4:#B08B5E;
+  --ev1:#8A4FD3; --ev2:#A08A2E; --ev3:#8A5A33;
   --p1:#2E8B57; --p2:#12827F; --p3:#7A4FC4; --p4:#B23D8E; --p5:#8B5E34; --p6:#6E7F1F; --p7:#5F6B7A; --p8:#4E9A2E; --p9:#8A7563; --p10:#B8678A; --p11:#2F9E8C; --p12:#9A6FB0; --dtoday:#0E8F6E; --dtom:#B5580F;
   --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   --hh:48px; --r:8px;
@@ -15,12 +15,12 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B; --ev4:#DDBB8E;
+  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B;
   --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
-  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B; --ev4:#DDBB8E;
+  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B;
   --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark }
 
 *{box-sizing:border-box}
@@ -276,7 +276,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .blk.se,.chip.se{border-color:var(--prc,var(--mute))}
 .allday .chip.se{color:var(--prc,var(--mute));font-weight:400}
 .blk.se{color:var(--ink)}
-.evc1.pr4{--prc:var(--ev1)}.evc2.pr4{--prc:var(--ev2)}.evc3.pr4{--prc:var(--ev3)}.evc4.pr4{--prc:var(--ev4)}.evc5.pr4{--prc:var(--pri1)}
+.evc1.pr4{--prc:var(--ev1)}.evc2.pr4{--prc:var(--ev2)}.evc3.pr4{--prc:var(--pri1)}.evc4.pr4{--prc:var(--ev3)}
+.seg.evseg label{color:var(--prc)}.seg.evseg label:has(input:checked){background:color-mix(in srgb,var(--prc) 16%,var(--surface));color:var(--ink);box-shadow:inset 0 0 0 1px var(--prc)}
 .blk.se.pr4[class*=evc],.chip.se.pr4[class*=evc]{background:color-mix(in srgb,var(--prc) 12%,var(--surface))}
 .blk.se.pr1,.blk.se.pr2,.blk.se.pr3,.chip.se.pr1,.chip.se.pr2,.chip.se.pr3{background:color-mix(in srgb,var(--prc) 6%,var(--surface))}
 .blk.se.is-done{opacity:.55}
@@ -634,7 +635,7 @@ async function tdSync(full){
   }finally{TD.busy=false}
 }
 function tdBuild(){
-  try{tdBuildInner();ntfySchedule()}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
+  try{tdBuildInner();ntfySchedule();setTimeout(tdMigrateEventLabels,0)}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
 }
 function tdBuildInner(){TD.buildError='';
   const P=window.PPMap,m=new Map(),merged=new Map();TD.taskAcc=new Map();
@@ -1301,7 +1302,7 @@ function renderCal(){
   cal.scrollTop=keepT;cal.scrollLeft=keepL;
 }
 const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
-const EVKEYS=['event','events','eventh','eventh2','eventc'];   // event, eventS, eventH, eventH2, eventC: all events, each with its calendar colour
+const EVKEYS=['ev','evsug','evcump','evhome'];   // ev, evSug, evCump, evHome: all events, each with its calendar colour
 const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0&&!c)c=i+1});return c};
 const isEvent=t=>evCat(t)>0;
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
@@ -1962,7 +1963,7 @@ form.addEventListener('change',e=>{if(e.target.id==='att-file'&&e.target.files.l
 
 
 /* ---------- Import a calendar file (.ics), e.g. exported from Proton Calendar, as events in Todoist (a one-time copy) ---------- */
-const EVCATS=[['event','Event'],['eventS','EventS'],['eventC','EventC'],['eventH','EventH'],['eventH2','EventH2']];
+const EVCATS=[['ev','Ev'],['evSug','EvSug'],['evCump','EvCump'],['evHome','EvHome']];
 function icsParse(text){
   const lines=String(text||'').replace(/\r?\n[ \t]/g,'').split(/\r?\n/),evs=[];let cur=null;
   for(const ln of lines){
@@ -2122,18 +2123,84 @@ function impSummary(){
     (s.changes?'<br>'+s.changes+' one-off changes to repeating events can’t be copied; the repeat keeps its usual time.':'')+
     (s.unsupported.length?'<br>Couldn’t copy these repeats: '+esc(s.unsupported.slice(0,5).join(', '))+(s.unsupported.length>5?'…':'')+'.':'');
 }
+
+/* ---------- the CALENDAR list for an event type, created in Todoist when missing ---------- */
+async function ensureCalList(title){
+  const findList=()=>{const b=items.get('b:CALENDAR');const s=b&&(b.sections||[]).find(x=>x.name===title&&accOfKey(x.id)===0);return s?s.id:null};
+  let sec=findList();if(sec)return sec;
+  const r=window.PPMap.listCommands('add',TD.structs[0],tdUuid,{board:'CALENDAR',title:title});
+  if(r.refused.length){toast(refusedMsg(r.refused[0]));return null}
+  tdSend(0,r.commands);
+  for(let i=0;i<40&&!(sec=findList());i++){await new Promise(z=>setTimeout(z,500));if(!TD.queue.length&&!TD.sending&&i%4===3)await tdSync(false).catch(()=>{})}
+  if(!sec)toast('The CALENDAR list couldn’t be created in Todoist. Try again in a minute.');
+  return sec;
+}
+
+/* ---------- one-time rename of the old event labels and their CALENDAR lists (event → ev, eventS → evSug, eventC → evCump, eventH/eventH2 → evHome) ---------- */
+const OLDEV={event:'ev',events:'evSug',eventc:'evCump',eventh:'evHome',eventh2:'evHome'};
+const OLDLIST={Event:'Ev',EventS:'EvSug',EventC:'EvCump',EventH:'EvHome',EventH2:'EvHome'};
+function tdMigrateEventLabels(){
+  if(!TD.on||!loaded||TD.migrating)return;
+  let n=0;
+  byKind('task').forEach(([id,t])=>{
+    const ls=t.labels||[];if(!ls.some(l=>OLDEV[String(l).toLowerCase()]))return;
+    items.set(id,Object.assign({},t,{labels:[...new Set(ls.map(l=>OLDEV[String(l).toLowerCase()]||l))]}));TD.dirty.set(id,true);n++;
+  });
+  // lists: rename in place; tasks of a second list for the same new name move into the first, and the empty list goes
+  const b=items.get('b:CALENDAR'),S=TD.structs[0],cmds=[];let moved=0;
+  if(b&&S){
+    const secs=(b.sections||[]).filter(x=>accOfKey(x.id)===0),keep={};
+    secs.forEach(x=>{if(!OLDLIST[x.name]&&Object.values(OLDLIST).includes(x.name))keep[x.name]=x.id});
+    secs.forEach(x=>{
+      const to=OLDLIST[x.name];if(!to)return;
+      const l=S.listsByKey.get(listOfKey(x.id));if(!l||!l.sectionId)return;
+      if(!keep[to]){keep[to]=x.id;cmds.push({type:'section_update',uuid:tdUuid(),args:{id:l.sectionId,name:window.PPMap.sectionName('CALENDAR',to)}});return}
+      const inIt=byKind('task').filter(e=>e[1].sectionId===x.id&&!e[1].parentId);
+      inIt.forEach(([id,t])=>{items.set(id,Object.assign({},items.get(id)||t,{sectionId:keep[to]}));TD.dirty.set(id,true);moved++});
+      if(!inIt.length)cmds.push({type:'section_delete',uuid:tdUuid(),args:{id:l.sectionId}});   // only once it is empty
+    });
+  }
+  if(!n&&!cmds.length&&!moved)return;
+  TD.migrating=true;setTimeout(()=>{TD.migrating=false},5000);
+  touch();render();
+  if(cmds.length)tdSend(0,cmds);
+  clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);
+  toast('Event labels renamed (ev, evSug, evCump, evHome)'+(n?' on '+n+(n===1?' task':' tasks'):'')+'.');
+}
+
+/* ---------- New event: from an empty spot in the month view ---------- */
+function openNewEvent(day){
+  curTask=null;reopen=null;
+  openDlg('New event',
+    '<input type="text" id="ne-title" name="title" placeholder="Event name" aria-label="Event name" autocomplete="off">'+
+    '<div class="fld"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"'+(i===0?' checked':'')+'><span>'+c[0]+'</span></label>').join('')+'</div></div>'+
+    '<div class="row"><label class="fld"><span>Day</span><input type="date" name="day" id="ne-day" value="'+esc(day)+'"></label>'+
+    '<label class="fld"><span>Time</span>'+timeFld('time','ne-time','','m')+'</label>'+
+    '<label class="fld" data-t="m"><span>Length</span><select name="dur">'+durOpts(60)+'</select></label>'+
+    '<label class="fld" id="ne-days-wrap"><span>Days</span><select name="days">'+opts([1,2,3,4,5,6,7,8,9,10,12,14,21,28].map(n=>[n,n===1?'1 day':n+' days']),1)+'</select></label></div>',
+    fd=>{createEvent(fd);return false},{saveLabel:'Add event'});
+}
+async function createEvent(fd){
+  const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return}
+  const cat=fd.get('evtype')||'ev',day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Number(fd.get('days'))||1;
+  if(!TD.on){const id=addTask(title,{labels:[cat],day:time?'':day,days:time?1:days});if(time)addSession(id,day,toMin(time),dur,null,-1);dlg.close();return}
+  const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Adding…';
+  const sec=await ensureCalList(EVCATS.find(c=>c[0]===cat)[1]);
+  if(!sec){btn.disabled=false;btn.textContent='Add event';return}
+  const id=nid(),task={kind:'task',title:title,notes:'',projectId:'b:CALENDAR',sectionId:sec,parentId:'',priority:4,labels:[cat],day:'',deadline:'',est:dur,done:false,order:nextOrder()};
+  if(time)items.set('s:'+id,{kind:'session',taskId:id,date:day,start:toMin(time),dur:dur,done:false,remind:-1});
+  else{task.day=day;if(days>1)task.days=days}
+  items.set(id,task);touch();render();tdMarkDirty(id);
+  dlg.close();toast(title+' added.');
+}
+form.addEventListener('input',e=>{if(e.target.id==='ne-time'){const w=$('#ne-days-wrap');if(w)w.hidden=!!e.target.value}});
+form.addEventListener('change',e=>{if(e.target.id==='ne-time'){const w=$('#ne-days-wrap');if(w)w.hidden=!!e.target.value}});
+
 async function runImport(){
   if(!IMP||!IMP.events.length)return;
   const cat=$('#imp-cat').value,title=EVCATS.find(c=>c[0]===cat)[1],btn=$('#dlg-save');btn.disabled=true;btn.textContent='Importing…';
-  const findList=()=>{const b=items.get('b:CALENDAR');const s=b&&(b.sections||[]).find(x=>x.name===title&&accOfKey(x.id)===0);return s?s.id:null};
-  let sec=findList();
-  if(!sec){
-    const r=window.PPMap.listCommands('add',TD.structs[0],tdUuid,{board:'CALENDAR',title:title});
-    if(r.refused.length){toast(refusedMsg(r.refused[0]));btn.textContent='Import';btn.disabled=false;return}
-    tdSend(0,r.commands);
-    for(let i=0;i<40&&!(sec=findList());i++){await new Promise(z=>setTimeout(z,500));if(!TD.queue.length&&!TD.sending&&i%4===3)await tdSync(false).catch(()=>{})}
-    if(!sec){toast('The CALENDAR list couldn’t be created in Todoist. Try again in a minute.');btn.textContent='Import';btn.disabled=false;return}
-  }
+  const sec=await ensureCalList(title);
+  if(!sec){btn.textContent='Import';btn.disabled=false;return}
   // don't copy what is already there (same name on the same day)
   const have=new Map(byKind('task').filter(e=>e[1].sectionId===sec).map(([id,t])=>{const s=items.get('s:'+id);return [plainText(t.title)+'|'+((s&&s.repeat)||t.recur?'R':(s?s.date:t.day)),id]}));let fixed=0;
   let n=0,dup=0;const ord0=nextOrder();
@@ -2601,7 +2668,7 @@ document.addEventListener('click',e=>{
   const chip=e.target.closest('.chip');
   if(chip){if(!chip.dataset.task)openItem(chip.dataset.id,chip.dataset.date);else if(lastPT==='touch')openTask(chip.dataset.task);return}
   const mc=e.target.closest('.mcell,.mc');
-  if(mc){st.anchor=pdate(mc.dataset.date);st.span='day';saveUi();render();return}
+  if(mc){if(e.target.closest('.dd')||e.target.closest('.more')){st.anchor=pdate(mc.dataset.date);st.span='day';saveUi();render()}else openNewEvent(mc.dataset.date);return}
   if(lastPT!=='touch')return;
   const blk=e.target.closest('.blk'),tk=e.target.closest('[data-task]'),dc=e.target.closest('.daycol');
   if(blk)openItem(blk.dataset.id,blk.dataset.date);else if(tk)openTask(tk.dataset.task);

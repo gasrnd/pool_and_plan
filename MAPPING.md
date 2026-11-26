@@ -106,9 +106,10 @@ These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but
 
 ### Events
 
-- A task with the label `event`, `eventS`, `eventC`, `eventH` or `eventH2` is an **event**; every other task is a task.
+- A task with the label `ev`, `evSug`, `evCump` or `evHome` is an **event**; every other task is a task.
 - Events without a time show in the calendar row (multi-day ones as bars); events with a time show in the agenda.
 - Todoist keeps at most 24 hours of length, so a multi-day length is kept as a last line in the description: `↔ 3 days`.
-- In the calendar each category has its colour: event purple, eventS mustard-khaki, eventC red (as P1), eventH brown, eventH2 sandy brown. A priority (P1–P3) replaces it. Lists are not coloured.
-- **Import calendar** (Pool & Plan menu) copies an `.ics` file or calendar link once, for example a calendar from Proton, into POOL as `CALENDAR <Category>`, labelled with that category. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing the same file again skips what is already there.
-
+- In the calendar each type has its colour: ev purple, evSug mustard-khaki, evCump red (as P1), evHome brown. A priority (P1–P3) replaces it. Lists are not coloured.
+- Clicking an empty spot in the month view adds an event on that day; you pick its type. It goes to `CALENDAR <Type>` (Ev, EvSug, EvCump, EvHome).
+- **Import calendar** (Pool & Plan menu) copies an `.ics` file or calendar link once, for example a calendar from Proton, into the same lists. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing again skips what is already there and corrects lengths and times.
+- The earlier labels (event, eventS, eventC, eventH, eventH2) are renamed once, automatically, with their CALENDAR lists; eventH2 joins evHome.
