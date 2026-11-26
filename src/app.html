@@ -73,6 +73,7 @@ button.pomo.due::after{background:var(--accent)}
 button.pomo.away{opacity:.6}
 button.pomo.off{font-style:italic}
 .chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+.evseg.need{box-shadow:0 0 0 2px var(--pri1)}
 .cfm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid color-mix(in srgb,var(--pri1) 45%,var(--line));background:color-mix(in srgb,var(--pri1) 7%,var(--surface));border-radius:8px}
 .cfm>span{flex:1 1 14em;min-width:0}
 .att-box{display:flex;flex-direction:column;gap:4px}
@@ -2215,7 +2216,7 @@ function openNewEvent(day){
   curTask=null;reopen=null;
   openDlg('New event',
     '<input type="text" id="ne-title" name="title" placeholder="Event name" aria-label="Event name" autocomplete="off">'+
-    '<div class="fld"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"'+(i===0?' checked':'')+'><span>'+c[0]+'</span></label>').join('')+'</div></div>'+
+    '<div class="fld"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"><span>'+c[0]+'</span></label>').join('')+'</div></div>'+
     '<div class="row"><label class="fld"><span>Day</span><input type="date" name="day" id="ne-day" value="'+esc(day)+'"></label>'+
     '<label class="fld"><span>Time</span>'+timeFld('time','ne-time','','m')+'</label>'+
     durField('ne',60,1)+'</div>',
@@ -2223,7 +2224,8 @@ function openNewEvent(day){
 }
 async function createEvent(fd,repeat){
   const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return}
-  const cat=fd.get('evtype')||'ev',day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Math.max(1,Number(fd.get('days'))||1);
+  if(!fd.get('evtype')){toast('Pick the type of event: ev, evS, evC or evH.');const g=$('.evseg');if(g){g.classList.add('need');setTimeout(()=>g.classList.remove('need'),1500)}return}
+  const cat=fd.get('evtype'),day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Math.max(1,Number(fd.get('days'))||1);
   if(!TD.on){const id=addTask(title,{labels:[cat],day:time?'':day,days:time?1:days,recur:time?null:repeat||null});if(time)addSession(id,day,toMin(time),dur,repeat||null,-1);dlg.close();return}
   const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Adding…';
   const sec=await ensureCalList(EVCATS.find(c=>c[0]===cat)[1]);
@@ -2422,7 +2424,7 @@ function openCal(id,preset,occ){
   const tasks=byKind('task').filter(x=>!isDone(x[1])).sort((a,b)=>a[1].title.localeCompare(b[1].title));
   const body=(id?'':'<div class="seg"><label><input type="radio" name="kind" value="event" id="f-kind-event" checked>'+(TD.on?'Event':'Fixed event')+'</label><label><input type="radio" name="kind" value="session" id="f-kind-session">Time block for a task</label></div>')+
     '<label class="fld" data-when="event"><span>Event</span><input type="text" name="title" id="f-etitle" value="'+esc(e.title)+'" autocomplete="off"></label>'+
-    (TD.on&&!id?'<div class="fld" data-when="event"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"'+(i===0?' checked':'')+'><span>'+c[0]+'</span></label>').join('')+'</div></div>':'')+
+    (TD.on&&!id?'<div class="fld" data-when="event"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"><span>'+c[0]+'</span></label>').join('')+'</div></div>':'')+
     (id?'':'<label class="fld" data-when="session"><span>Task</span><select name="taskId" id="f-task"><option value="">New task…</option>'+opts(tasks.map(([tid,t])=>[tid,t.title]),'-')+'</select></label>'+
       '<label class="fld" data-when="session newtask"><span>New task name</span><input type="text" name="newTitle" id="f-newtitle" autocomplete="off"></label>')+
     '<label class="chk" data-when="event"><input type="checkbox" name="allDay" id="f-allday"'+(e.allDay?' checked':'')+'> All day (trips, holidays)</label>'+
@@ -2446,7 +2448,7 @@ function openCal(id,preset,occ){
     const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return false}
     if(TD.on&&!id){   // with Todoist an event is a task labelled ev, evS, evC or evH, kept in its CALENDAR list
       const allDay=!!fd.get('allDay')||noTime,end=fd.get('end')||date,f2=new FormData();
-      f2.set('title',title);f2.set('evtype',fd.get('evtype')||'ev');f2.set('day',date);f2.set('time',allDay?'':fd.get('time'));f2.set('dur',String(dur));
+      f2.set('title',title);f2.set('evtype',fd.get('evtype')||'');f2.set('day',date);f2.set('time',allDay?'':fd.get('time'));f2.set('dur',String(dur));
       f2.set('days',String(allDay?Math.max(1,diffDays(date,end<date?date:end)+1):1));if(!allDay&&remind>=0)f2.set('remind',String(remind));
       createEvent(f2,rep);return false;
     }
@@ -2731,6 +2733,8 @@ document.addEventListener('click',e=>{
   if(chip){if(!chip.dataset.task)openItem(chip.dataset.id,chip.dataset.date);else if(lastPT==='touch')openTask(chip.dataset.task);return}
   const mc=e.target.closest('.mcell,.mc');
   if(mc){if(e.target.closest('.dd')||e.target.closest('.more'))focusDay(mc.dataset.date);else openNewEvent(mc.dataset.date);return}
+  const adr=e.target.closest('.allday');
+  if(adr&&!e.target.closest('.gut')){const dc=[...document.querySelectorAll('.daycol')].find(x=>{const r=x.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<r.right});if(dc){openNewEvent(dc.dataset.date);return}}
   if(lastPT!=='touch')return;
   const blk=e.target.closest('.blk'),tk=e.target.closest('[data-task]'),dc=e.target.closest('.daycol');
   if(blk)openItem(blk.dataset.id,blk.dataset.date);else if(tk)openTask(tk.dataset.task);
