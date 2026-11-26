@@ -108,7 +108,7 @@ These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but
 
 - A task with the label `ev`, `evS`, `evC` or `evH` is an **event**; every other task is a task.
 - Events without a time show in the calendar row (multi-day ones as bars); events with a time show in the agenda.
-- Events without a time (all-day and multi-day) appear only on the calendar, never in lists. Events with a time appear in both.
+- Events without a time (all-day and multi-day) appear in the lists of the CALENDAR board and on the calendar, but in no other list (Today, Upcoming, other boards…). Events with a time appear everywhere, like tasks.
 - A completed event stays on the calendar, faded and struck through; it leaves the lists.
 - Todoist keeps at most 24 hours of length, so a multi-day duration is kept as a last line in the description: `↔ 3 days`.
 - In the calendar each type has its colour: ev purple, evS mustard-khaki, evC red (as P1), evH brown. A priority (P1–P3) replaces it. Lists are not coloured.

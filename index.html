@@ -313,11 +313,13 @@ a.lk:hover{text-decoration-thickness:2px}
 .zc.hr{border-top:1px solid var(--line)}
 .zc.on{background:color-mix(in srgb,var(--pc) 22%,var(--surface))}
 .seg.swatches{display:grid;grid-template-columns:repeat(6,1fr)}
-.month{display:flex;flex-direction:column;min-height:100%}
+.month{display:flex;flex-direction:column;min-height:calc(100% - 30px)}
 .mweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:1 0 auto;min-height:104px;row-gap:2px;align-content:start}
 .mweek .dd{font-size:13px;padding:3px 6px 0;cursor:pointer;justify-self:start}
 .mweek .dd.tn{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:1px 7px;margin:2px 0 0 3px}
 .mlist{display:flex;flex-direction:column;gap:2px;min-width:0;padding:0 2px 3px;cursor:pointer}
+.mslot{min-width:0;display:flex;flex-direction:column}
+.mslot .more{font-size:11px;color:var(--mute);padding:0 6px;cursor:pointer}
 .chip .mt{font-weight:500;font-variant-numeric:tabular-nums;color:var(--mute)}
 .chip.bar{margin:0 3px}
 .chip.cs{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0;border-left-style:dashed}
@@ -1251,7 +1253,7 @@ function cardHtml(id,t,all){
     (subs.length&&subOpen?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
 }
 function inLane(l,id,t){
-  if(isEvent(t)&&t.day&&!items.has('s:'+id)&&!sessionsOf(id).length)return false;   // all-day events (no time) live on the calendar only
+  if(isEvent(t)&&t.day&&!items.has('s:'+id)&&!sessionsOf(id).length&&st.proj!=='b:CALENDAR')return false;   // all-day and multi-day events: only on the CALENDAR board (and the calendar)
   if(l.type==='proj')return pidOf(t)===l.id&&(st.proj!=='@periodic'||!!t.recur||sessionsOf(id).some(e=>e[1].repeat));
   if(l.type==='sec')return pidOf(t)===st.proj&&secOf(t)===l.id;
   if(l.type==='label')return l.id?(t.labels||[]).includes(l.id):!(t.labels||[]).length;
@@ -1383,6 +1385,8 @@ function renderMonth(cal){
   const a=new Date(st.anchor),first=new Date(a.getFullYear(),a.getMonth(),1),start=monday(first),today=tdy();
   const last=new Date(a.getFullYear(),a.getMonth()+1,0),weeks=Math.ceil((diffDays(ymd(start),ymd(last))+1)/7);
   doneEvWanted(ymd(start),ymd(addDays(start,weeks*7-1)));
+  // as many rows per week as fit on screen: the visible height shared by the weeks, about 22px a row
+  const fitRows=Math.max(3,Math.floor((((cal.clientHeight||700)-30)/weeks-26)/21));
   const oldEv=byKind('event'),sessions=byKind('session'),hasSes=new Set(sessions.map(e=>e[1].taskId));
   const tasks=byKind('task').filter(([id,t])=>(!isDone(t)||isEvent(t))&&!(t.parentId&&items.has(t.parentId)));
   let html='';
@@ -1399,7 +1403,8 @@ function renderMonth(cal){
     bars.sort((x,y)=>(x.old?5:evRank(x.t))-(y.old?5:evRank(y.t))||x.a-y.a||(y.b-y.a)-(x.b-x.a));
     const lanes=[];bars.forEach(b=>{let r=lanes.findIndex(end=>end<b.a);if(r<0){r=lanes.length;lanes.push(-1)}lanes[r]=b.b;b.r=r});
     const nb=lanes.length;
-    html+='<div class="mweek" style="grid-template-rows:auto'+(nb?' repeat('+nb+',auto)':'')+' 1fr">'+
+    const R=Math.max(nb+1,fitRows);
+    html+='<div class="mweek" style="grid-template-rows:auto repeat('+R+',auto) 1fr">'+
       keys.map((k,i)=>'<div class="mcell'+(pdate(k).getMonth()!==a.getMonth()?' out':'')+(k===today?' today':'')+'" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:1/-1"></div>').join('')+
       keys.map((k,i)=>'<span class="dd mc'+(k===today?' tn':'')+'" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:1">'+pdate(k).getDate()+'</span>').join('')+
       bars.map(b=>'<div class="'+(b.old?'chip ev':chipCls(b.t)+(isDone(b.t)?' is-done':''))+' bar'+(b.cs?' cs':'')+(b.ce?' ce':'')+'" '+(b.old?'data-id="'+b.old+'" data-date="'+b.t.date+'"':'data-task="'+b.id+'"')+' tabindex="0" role="button" style="grid-column:'+(b.a+1)+'/'+(b.b+2)+';grid-row:'+(b.r+2)+'">'+fmt(b.t.title)+'</div>').join('');
@@ -1416,8 +1421,12 @@ function renderMonth(cal){
         (isEvent(t)?evs:tks).push({r:evRank(t),s:-1,p:t.priority||4,h:'<div class="'+chipCls(t)+(isDone(t)?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'});
       });
       evs.sort((x,y)=>x.r-y.r||x.s-y.s);tks.sort((x,y)=>x.p-y.p||x.s-y.s);
-      const all=evs.concat(tks),room=Math.max(1,5-nb);
-      html+='<div class="mlist mc" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:'+(nb+2)+'">'+all.slice(0,room).map(c=>c.h).join('')+(all.length>room?'<span class="more">+'+(all.length-room)+' more</span>':'')+'</div>';
+      const all=evs.concat(tks),used=new Set(bars.filter(b=>b.a<=i&&i<=b.b).map(b=>b.r));
+      const free=[];for(let r=0;r<R;r++)if(!used.has(r))free.push(r);
+      const fits=all.length<=free.length,shown=fits?all:all.slice(0,free.length-1);
+      const slot=(r,inner)=>'<div class="mslot mc" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:'+(r+2)+'">'+inner+'</div>';
+      shown.forEach((c,j)=>{html+=slot(free[j],c.h)});
+      if(!fits)html+=slot(free[free.length-1],'<span class="more">+'+(all.length-shown.length)+' more</span>');
     });
     html+='</div>';
   }
