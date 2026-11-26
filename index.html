@@ -682,7 +682,7 @@ function tdBuildInner(){TD.buildError='';
       const rs=remSplit(x.notes);
       const task={kind:'task',title:x.title,notes:rs.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
         projectId:list?'b:'+list.board:'',sectionId:list?ai+'|'+x.listKey:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted,acc:ai};
-      if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;if(x.days>1)task.days=x.days}
+      if(x.time==null){task.day=x.day;if(x.repeat)task.recur=x.repeat;const dd=rs.days||x.days;if(dd>1)task.days=dd}
       else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
       if(rs.reminders)task.reminders=rs.reminders;
       m.set(t.id,task);TD.taskAcc.set(t.id,ai);
@@ -722,7 +722,7 @@ function tdTaskPair(id){
   const t=items.get(id),ai=tdAccOfTask(id,t),S=TD.structs[ai],acc=TD.accounts[ai],P=window.PPMap;
   const r=acc&&acc.raw.items.get(id),before=r?P.fromTodoist(r,S):null;
   if(!t)return {ai:ai,before:before,after:null};
-  const a=Object.assign({},before||{repeatEditable:true,repeatString:'',durDefault:false,days:1},{id:id,title:t.title,notes:Array.isArray(t.reminders)?remJoin(t.notes,t.reminders):(t.notes||''),priority:t.priority||4,labels:t.labels||[],parentId:t.parentId||'',done:!!t.done,order:t.order});
+  const a=Object.assign({},before||{repeatEditable:true,repeatString:'',durDefault:false,days:1},{id:id,title:t.title,notes:remJoin(t.notes,Array.isArray(t.reminders)?t.reminders:null,!items.get('s:'+id)&&t.day&&(t.days||1)>1?t.days:null),priority:t.priority||4,labels:t.labels||[],parentId:t.parentId||'',done:!!t.done,order:t.order});
   let lk=listOfKey(t.sectionId);
   if(!lk&&t.projectId){const b=items.get(t.projectId);const first=b&&(b.sections||[]).find(x=>accOfKey(x.id)===ai);if(first)lk=listOfKey(first.id)}
   if(lk&&accOfKey(t.sectionId)!=null&&accOfKey(t.sectionId)!==ai)return {ai:ai,before:before,after:a,crossAccount:true};
@@ -1532,20 +1532,34 @@ function remEncode(list){
   return (list||[]).map(x=>x.at?x.at.replace('T',' '):x.min&&x.min%1440===0?(x.min/1440)+'d':x.min&&x.min%60===0?(x.min/60)+'h':(x.min||0)+'m')
     .filter(s=>!seen.has(s)&&seen.add(s)).join(', ');
 }
+// The last lines of a Todoist description can hold what Todoist itself can't keep:
+// "↔ 3 days" (length of a multi-day task; Todoist allows at most 24 hours) and "⏰ 10m, 1h" (reminders).
 function remSplit(desc){
-  const s=String(desc||''),lines=s.split('\n');let i=lines.length-1;while(i>=0&&!lines[i].trim())i--;
-  const m=i>=0&&lines[i].trim().match(/^\u23F0\uFE0F?\s*(.*)$/);
-  if(!m)return {notes:s,reminders:null};
-  const out=[];
-  m[1].split(',').forEach(tok=>{tok=tok.trim();let k;
-    if((k=tok.match(/^(\d+)\s*(m|min|h|d)$/i)))out.push({min:Number(k[1])*(/^h/i.test(k[2])?60:/^d/i.test(k[2])?1440:1)});
-    else if((k=tok.match(/^(\d{4}-\d\d-\d\d)[ T](\d\d:\d\d)$/)))out.push({at:k[1]+'T'+k[2]});
-  });
-  return {notes:lines.slice(0,i).join('\n').replace(/\s+$/,''),reminders:out};
+  const s=String(desc||''),lines=s.split('\n');let i=lines.length-1,reminders=null,days=null,found=false;
+  for(;;){
+    while(i>=0&&!lines[i].trim())i--;
+    if(i<0)break;
+    const L=lines[i].trim();let m;
+    if(reminders==null&&(m=L.match(/^\u23F0\uFE0F?\s*(.*)$/))){
+      reminders=[];
+      m[1].split(',').forEach(tok=>{tok=tok.trim();let k;
+        if((k=tok.match(/^(\d+)\s*(m|min|h|d)$/i)))reminders.push({min:Number(k[1])*(/^h/i.test(k[2])?60:/^d/i.test(k[2])?1440:1)});
+        else if((k=tok.match(/^(\d{4}-\d\d-\d\d)[ T](\d\d:\d\d)$/)))reminders.push({at:k[1]+'T'+k[2]});
+      });
+      i--;found=true;continue;
+    }
+    if(days==null&&(m=L.match(/^\u2194\uFE0F?\s*(\d+)\s*days?$/i))){days=Number(m[1]);i--;found=true;continue}
+    break;
+  }
+  if(!found)return {notes:s,reminders:null,days:null};
+  return {notes:lines.slice(0,i+1).join('\n').replace(/\s+$/,''),reminders:reminders,days:days};
 }
-function remJoin(notes,list){
-  const code=remEncode(list);if(!code)return String(notes||'');
-  const n=String(notes||'').replace(/\s+$/,'');return (n?n+'\n\n':'')+'\u23F0 '+code;
+function remJoin(notes,list,days){
+  const code=remEncode(list),meta=[];
+  if(days>1)meta.push('\u2194 '+days+' days');
+  if(code)meta.push('\u23F0 '+code);
+  if(!meta.length)return String(notes||'');
+  const n=String(notes||'').replace(/\s+$/,'');return (n?n+'\n\n':'')+meta.join('\n');
 }
 const plainText=s=>String(s||'').replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/\*\*|__|~~|`/g,'').replace(/(^|\s)\*(\S[^*]*)\*/g,'$1$2');
 // Every reminder that should fire within ntfy's 3-day window
@@ -2129,10 +2143,16 @@ async function runImport(){
     if(!sec){toast('The CALENDAR list couldn’t be created in Todoist. Try again in a minute.');btn.textContent='Import';btn.disabled=false;return}
   }
   // don't copy what is already there (same name on the same day)
-  const have=new Set(byKind('task').filter(e=>e[1].sectionId===sec).map(([id,t])=>{const s=items.get('s:'+id);return plainText(t.title)+'|'+((s&&s.repeat)||t.recur?'R':(s?s.date:t.day))}));
+  const have=new Map(byKind('task').filter(e=>e[1].sectionId===sec).map(([id,t])=>{const s=items.get('s:'+id);return [plainText(t.title)+'|'+((s&&s.repeat)||t.recur?'R':(s?s.date:t.day)),id]}));let fixed=0;
   let n=0,dup=0;const ord0=nextOrder();
   IMP.events.forEach(ev=>{
-    if(have.has(ev.title+'|'+(ev.repeat?'R':ev.date))){dup++;return}
+    const old=have.get(ev.title+'|'+(ev.repeat?'R':ev.date));
+    if(old){dup++;
+      // already there: bring its length (and time) in line with the calendar
+      const t=items.get(old),s=items.get('s:'+old);
+      if(ev.time==null&&!s&&(t.days||1)!==(ev.days||1)){items.set(old,Object.assign({},t,{days:ev.days||1}));TD.dirty.set(old,true);fixed++}
+      else if(ev.time!=null&&s&&(s.start!==ev.time||s.dur!==ev.dur)){items.set('s:'+old,Object.assign({},s,{start:ev.time,dur:ev.dur}));TD.dirty.set(old,true);fixed++}
+      return}
     const id=nid(),task={kind:'task',title:ev.title,notes:ev.notes,projectId:'b:CALENDAR',sectionId:sec,parentId:'',priority:4,labels:[cat],day:'',deadline:'',est:ev.dur||60,done:false,order:ord0+n};
     if(ev.time==null){task.day=ev.date;if(ev.repeat)task.recur=ev.repeat;if(ev.days>1)task.days=ev.days}
     else{const s={kind:'session',taskId:id,date:ev.date,start:ev.time,dur:ev.dur,done:false,remind:-1};if(ev.repeat)s.repeat=ev.repeat;items.set('s:'+id,s)}
@@ -2140,7 +2160,7 @@ async function runImport(){
   });
   touch();render();clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);
   dlg.close();
-  toast(n+(n===1?' event':' events')+' copied to CALENDAR / '+title+(dup?' ('+dup+' already there)':'')+'.');
+  toast(n+(n===1?' event':' events')+' copied to CALENDAR / '+title+(dup?' ('+dup+' already there'+(fixed?', '+fixed+' corrected':'')+')':'')+'.');
 }
 
 form.addEventListener('input',e=>{if(e.target.id==='done-q'){DONE.q=e.target.value;doneRender()}});
