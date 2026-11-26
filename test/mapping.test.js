@@ -6,12 +6,15 @@ let u = 0; const uuid = () => 'u' + (++u);
 
 t('section names', () => {
   assert.deepStrictEqual(M.parseSectionName('ADMIN Tasks'), { board: 'ADMIN', list: 'Tasks', ok: true });
-  assert.deepStrictEqual(M.parseSectionName('SELF GROWING Reading list'), { board: 'SELF GROWING', list: 'Reading list', ok: true });
+  assert.deepStrictEqual(M.parseSectionName('SELF-GROWING Reading list'), { board: 'SELF-GROWING', list: 'Reading list', ok: true });
+  assert.deepStrictEqual(M.parseSectionName('ADMIN LCDLS'), { board: 'ADMIN', list: 'LCDLS', ok: true });
+  assert.deepStrictEqual(M.parseSectionName('ADMIN TO DO Soon'), { board: 'ADMIN', list: 'TO DO Soon', ok: true });
   assert.deepStrictEqual(M.parseSectionName('ADMIN Buy & Sell'), { board: 'ADMIN', list: 'Buy & Sell', ok: true });
-  assert.strictEqual(M.parseSectionName('ADMIN PROJECTS').problem, 'no-list-title');
+  assert.strictEqual(M.parseSectionName('ADMIN').problem, 'no-list-title');
   assert.strictEqual(M.parseSectionName('Loose ideas').board, M.UNSORTED);
   assert.strictEqual(M.checkListTitle('Projects').ok, true);
-  assert.deepStrictEqual(M.checkListTitle('PROJECTS'), { ok: false, problem: 'caps', suggestion: 'Projects' });
+  assert.strictEqual(M.checkListTitle('PROJECTS').ok, true);
+  assert.strictEqual(M.checkListTitle('  ').ok, false);
   assert.strictEqual(M.checkListTitle('A list').ok, true);
 });
 
@@ -189,7 +192,7 @@ t('lists and boards', () => {
   let r = M.listCommands('add', S, uuid, { board: 'ADMIN', title: 'Waiting', tempId: 'l1' });
   assert.deepStrictEqual(r.commands[0].args, { name: 'ADMIN Waiting', project_id: 'P1' });
   r = M.listCommands('add', S, uuid, { board: 'ADMIN', title: 'WAITING' });
-  assert.deepStrictEqual(r.refused, ['title-caps']); assert.strictEqual(r.suggestion, 'Waiting');
+  assert.deepStrictEqual(r.commands[0].args, { name: 'ADMIN WAITING', project_id: 'P1' });
   r = M.listCommands('add', S, uuid, { board: 'Holidays', title: 'Flights', projectId: 'P4' });
   assert.deepStrictEqual(r.commands[0].args, { name: 'Flights', project_id: 'P4' });
   r = M.listCommands('rename', S, uuid, { key: 's:S2', title: 'Sell' });

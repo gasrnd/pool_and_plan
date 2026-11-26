@@ -16,11 +16,12 @@ How Pool & Plan reads and writes Todoist. Todoist is the only place data is stor
 
 ### Section names: `BOARD List title`
 
-- The leading words written **entirely in capitals** are the board; the rest is the list title.
+- The **first space** separates board and list: the first word, written in capitals, is the board; everything after it is the list title.
   - `ADMIN Tasks` → board ADMIN, list "Tasks"
-  - `SELF GROWING Reading` → board SELF GROWING, list "Reading"
+  - `ADMIN LCDLS` → board ADMIN, list "LCDLS" (list titles may be in capitals)
   - `ADMIN Buy & Sell` → board ADMIN, list "Buy & Sell"
-- A list title is never all capitals beyond its first letter. `ADMIN PROJECTS` would read as a board called "ADMIN PROJECTS" with no list, so the planner asks for a title like `ADMIN Projects`.
+  - `SELF-GROWING Reading` → board SELF-GROWING, list "Reading"
+- A board name is one word. For two words use a hyphen (`SELF-GROWING`); the planner turns spaces in a new board name into hyphens.
 - A section in POOL or MUSIC without a capitalised board word goes to an **Unsorted** board, so it is never hidden.
 - Boards are shown in the order they first appear in POOL, unless the settings say otherwise. Lists keep Todoist's section order.
 

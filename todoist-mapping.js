@@ -15,25 +15,22 @@
 
   /* ---------- names ---------- */
 
-  // "SELF GROWING Reading" -> {board:'SELF GROWING', list:'Reading'}
+  // The first space separates board and list: "ADMIN Tasks" -> ADMIN / Tasks, "ADMIN LCDLS" -> ADMIN / LCDLS.
+  // The board is one word written in capitals (use a hyphen for two words: "SELF-GROWING Reading").
   function parseSectionName(name) {
-    const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-    let i = 0;
-    while (i < words.length && isCapsWord(words[i])) i++;
-    const board = words.slice(0, i).join(' ');
-    const list = words.slice(i).join(' ');
-    if (!board) return { board: UNSORTED, list: list, ok: false, problem: 'no-board' };
-    if (!list) return { board: board, list: '', ok: false, problem: 'no-list-title' };
-    return { board: board, list: list, ok: true };
+    const s = String(name || '').trim().replace(/\s+/g, ' ');
+    const i = s.indexOf(' ');
+    const first = i < 0 ? s : s.slice(0, i), rest = i < 0 ? '' : s.slice(i + 1);
+    if (!isCapsWord(first)) return { board: UNSORTED, list: s, ok: false, problem: 'no-board' };
+    if (!rest) return { board: first, list: '', ok: false, problem: 'no-list-title' };
+    return { board: first, list: rest, ok: true };
   }
 
   function sectionName(board, list) { return board + ' ' + list; }
 
-  // A list title is valid when it does not start with an all-capitals word.
+  // Any non-empty list title works, capitals included: everything after the first space is the list.
   function checkListTitle(title) {
-    const first = String(title || '').trim().split(/\s+/)[0] || '';
-    if (!first) return { ok: false, problem: 'empty' };
-    if (isCapsWord(first) && first.length > 1) return { ok: false, problem: 'caps', suggestion: first.charAt(0) + first.slice(1).toLowerCase() + String(title).trim().slice(first.length) };
+    if (!String(title || '').trim()) return { ok: false, problem: 'empty' };
     return { ok: true };
   }
 
@@ -67,12 +64,8 @@
     const liveSecs = (sections || []).filter(s => !s.is_deleted && !s.is_archived)
       .sort((a, b) => (a.section_order || 0) - (b.section_order || 0));
     const containerIds = [];
-    const placed = (layout && layout.projectBoards) || {};   // projectId -> board: show that project as one list there
     live.forEach(p => {
-      let c = classifyProject(p);
-      const to = placed[p.id];
-      if (to === '-' && c.kind === 'board') c = { kind: 'hidden' };
-      else if (to && c.kind === 'board') c = { kind: 'linked', board: String(to).trim().toUpperCase(), list: String(p.name || '').trim(), placed: true };
+      const c = classifyProject(p);
       projectRole.set(p.id, c);
       if (c.kind === 'inbox') inboxProjectId = p.id;
       if (c.kind === 'container') containerIds.push(p.id);
