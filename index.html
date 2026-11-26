@@ -173,6 +173,7 @@ header.top>.railopts #sort-sel,header.top>.railopts .chk{font-size:13px}
 #main.board #board .lane{flex:0 0 auto;width:var(--lw,290px);max-width:440px}
 #main.board #board .newlane{flex:0 0 78px;width:auto}
 #main.board #board .newlane:has(form){flex-basis:230px}
+.lane.focus{box-shadow:0 0 0 2px var(--accent);transition:box-shadow .3s}
 .lane{background:var(--sunk);border-radius:var(--r);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid transparent}
 .lane.drop{border-color:var(--accent)}
 .lane-h{display:flex;align-items:center;gap:8px;padding:0 2px}
@@ -1074,6 +1075,15 @@ function syncSubs(id){
 }
 
 /* ---------- render ---------- */
+function focusDay(k){
+  st.anchor=pdate(k);st.span='5';st.proj='@days';st.upFocus=k;if(st.view!=='plan')st.view='plan';saveUi();render();
+  requestAnimationFrame(()=>{
+    const bd=$('#board'),ln=bd&&bd.querySelector('.lane[data-lane="'+k+'"]');
+    if(!ln){if(k<tdy())toast('Upcoming starts today; '+dateName(k)+' is shown in the calendar.');return}
+    bd.scrollLeft=Math.max(0,ln.offsetLeft-bd.offsetLeft-4);
+    ln.classList.add('focus');setTimeout(()=>ln.classList.remove('focus'),1600);
+  });
+}
 function spanDays(){return st.span==='day'?1:st.span==='week'?7:Number(st.span)||7}
 function visDays(){if(st.span==='week'){const m=monday(st.anchor);return [0,1,2,3,4,5,6].map(i=>addDays(m,i))}return Array.from({length:spanDays()},(_,i)=>addDays(st.anchor,i))}
 const sortKey=()=>st.proj===''?'inbox':String(st.proj).replace('@','v_');
@@ -1168,7 +1178,8 @@ function lanesDef(){
   if(st.proj==='@today')return [{id:'late',name:'Overdue',type:'day',optional:true},{id:tdy(),name:'Today',type:'day'}];
   if(st.proj==='@days'){
     const t=new Date(),ls=[{id:'late',name:'Overdue',type:'day',optional:true}];let k='';
-    for(let i=0;i<14;i++){k=ymd(addDays(t,i));ls.push({id:k,name:dateName(k),type:'day'})}
+    const n=st.upFocus&&st.upFocus>tdy()?Math.min(366,Math.max(14,diffDays(tdy(),st.upFocus)+5)):14;
+    for(let i=0;i<n;i++){k=ymd(addDays(t,i));ls.push({id:k,name:dateName(k),type:'day'})}
     ls.push({id:'later',name:'Later',type:'day',optional:true,after:k});return ls;
   }
   if(st.proj==='@labels'){const labs=[...new Set(byKind('task').flatMap(e=>e[1].labels||[]))].sort();return labs.map(l=>({id:l,name:'@'+l,type:'label'})).concat([{id:'',name:'No label',type:'label'}])}
@@ -2602,7 +2613,7 @@ const ACT={
     items.set(id,Object.assign({},t,{attachments:t.attachments.filter(x=>x!==a)}));touch();render();attRefresh(id);toast('Attachment removed.')},
   hideBoard:b=>{const n=b.dataset.v;TD.layout.hidden=[...new Set((TD.layout.hidden||[]).concat([n]))];tdSaveLayout();if(st.proj==='b:'+n){st.proj='@today';saveUi()}tdBuild();toast(n+' is hidden here. Its project in Todoist is untouched.')},
   showBoard:b=>{const n=b.dataset.v;TD.layout.hidden=(TD.layout.hidden||[]).filter(x=>x!==n);tdSaveLayout();tdBuild()},
-  pickProj:b=>{st.proj=b.dataset.v;saveUi();render()},
+  pickProj:b=>{st.proj=b.dataset.v;st.upFocus=null;saveUi();render()},
   openCompleted:()=>openCompleted(),
   doneMore:()=>doneLoadMore(),
   doneReopen:b=>{const ai=Number(b.dataset.ai),id=b.dataset.id;tdSend(ai,[{type:'item_uncomplete',uuid:tdUuid(),args:{id:id}}]);
@@ -2717,7 +2728,7 @@ document.addEventListener('click',e=>{
   const chip=e.target.closest('.chip');
   if(chip){if(!chip.dataset.task)openItem(chip.dataset.id,chip.dataset.date);else if(lastPT==='touch')openTask(chip.dataset.task);return}
   const mc=e.target.closest('.mcell,.mc');
-  if(mc){if(e.target.closest('.dd')||e.target.closest('.more')){st.anchor=pdate(mc.dataset.date);st.span='day';saveUi();render()}else openNewEvent(mc.dataset.date);return}
+  if(mc){if(e.target.closest('.dd')||e.target.closest('.more'))focusDay(mc.dataset.date);else openNewEvent(mc.dataset.date);return}
   if(lastPT!=='touch')return;
   const blk=e.target.closest('.blk'),tk=e.target.closest('[data-task]'),dc=e.target.closest('.daycol');
   if(blk)openItem(blk.dataset.id,blk.dataset.date);else if(tk)openTask(tk.dataset.task);
@@ -2748,7 +2759,7 @@ $('#board').addEventListener('focusout',e=>{
   setTimeout(()=>{const n=$('#lane-add-input');if(n&&document.activeElement!==n&&!n.value.trim()){st.addIn=null;renderBoard()}},150);
 });
 $('#board').addEventListener('keydown',e=>{if(e.key==='Escape'&&e.target.id==='lane-add-input'){st.addIn=null;renderBoard()}});
-$('#proj-sel').addEventListener('change',e=>{st.proj=e.target.value;saveUi();e.target.blur();render()});
+$('#proj-sel').addEventListener('change',e=>{st.proj=e.target.value;st.upFocus=null;saveUi();e.target.blur();render()});
 $('#sort-sel').addEventListener('change',e=>{
   const v=e.target.value;e.target.blur();if(!v||v===boardSort())return;
   const pf=items.get('prefs')||{kind:'prefs',sort:{}},so=Object.assign({},pf.sort||{});so[sortKey()]=v;
