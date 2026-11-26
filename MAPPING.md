@@ -103,3 +103,11 @@ These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but
 
 - The website stores nothing on a server. Your Todoist token stays in the browser of each device you connect.
 - Nothing about Notion is handled here; the separate routine keeps Notion and Todoist in step.
+
+### Events
+
+- A task with the label `event`, `eventS`, `eventH` or `eventH2` is an **event**; every other task is a task.
+- Events without a time show in the calendar row (multi-day ones as bars); events with a time show in the agenda.
+- In the calendar each category has its colour: event purple, eventS mustard-khaki, eventH brown, eventH2 sandy brown. A priority (P1–P3) replaces it. Lists are not coloured.
+- **Import calendar** (Pool & Plan menu) copies an `.ics` file once, for example a calendar exported from Proton, into POOL as `CALENDAR <Category>`, labelled with that category. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing the same file again skips what is already there.
+

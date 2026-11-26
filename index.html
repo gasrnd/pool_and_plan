@@ -12,6 +12,7 @@
 :root{
   --bg:#E8EBF0; --surface:#F6F8FA; --sunk:#DCE1E8; --line:#CBD2DB; --ink:#18212B; --mute:#5C6978; --dark:#8D97A3; --later:#5A2D8C; --pri1:#D1453B; --pri2:#EB8909; --pri3:#246FE0;
   --accent:#0B7A85; --accent-ink:#FFFFFF; --band:rgba(226,160,30,.20); --band-ink:#7A5200; --now:#D6364B;
+  --ev1:#8A4FD3; --ev2:#A08A2E; --ev3:#8A5A33; --ev4:#B08B5E;
   --p1:#2E8B57; --p2:#12827F; --p3:#7A4FC4; --p4:#B23D8E; --p5:#8B5E34; --p6:#6E7F1F; --p7:#5F6B7A; --p8:#4E9A2E; --p9:#8A7563; --p10:#B8678A; --p11:#2F9E8C; --p12:#9A6FB0; --dtoday:#0E8F6E; --dtom:#B5580F;
   --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   --hh:48px; --r:8px;
@@ -19,10 +20,12 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
+  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B; --ev4:#DDBB8E;
   --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#10151B; --surface:#182029; --sunk:#0B0F14; --line:#2A3542; --ink:#E7ECF2; --mute:#93A0AE; --dark:#66717E; --later:#9A78D6; --pri1:#FF7066; --pri2:#FF9A14; --pri3:#5297FF;
   --accent:#56C6CF; --accent-ink:#06282C; --band:rgba(240,190,80,.13); --band-ink:#E9C877; --now:#FF6B7D;
+  --ev1:#B794F4; --ev2:#D6C06A; --ev3:#C9966B; --ev4:#DDBB8E;
   --p1:#5FCB8E; --p2:#4FC9C4; --p3:#B194F0; --p4:#E58BC8; --p5:#CFA073; --p6:#B4C85A; --p7:#A3AFBD; --p8:#8FD06A; --p9:#C2AE9C; --p10:#EDA0C0; --p11:#6FD8C4; --p12:#CDA8E3; --dtoday:#4FD0A8; --dtom:#F0A060; color-scheme:dark }
 
 *{box-sizing:border-box}
@@ -278,6 +281,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .blk.se,.chip.se{border-color:var(--prc,var(--mute))}
 .allday .chip.se{color:var(--prc,var(--mute));font-weight:400}
 .blk.se{color:var(--ink)}
+.evc1.pr4{--prc:var(--ev1)}.evc2.pr4{--prc:var(--ev2)}.evc3.pr4{--prc:var(--ev3)}.evc4.pr4{--prc:var(--ev4)}
+.blk.se.pr4[class*=evc],.chip.se.pr4[class*=evc]{background:color-mix(in srgb,var(--prc) 12%,var(--surface))}
 .blk.se.pr1,.blk.se.pr2,.blk.se.pr3,.chip.se.pr1,.chip.se.pr2,.chip.se.pr3{background:color-mix(in srgb,var(--prc) 6%,var(--surface))}
 .blk.se.is-done{opacity:.55}
 .blk.se.is-done .blk-t{text-decoration:line-through}
@@ -403,7 +408,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <body>
 
 <header class="top">
-  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button><button type="button" data-act="openCompleted" id="m-done">Completed</button><button type="button" data-act="pomoOpen" id="m-pomo">Pomodoros</button><button type="button" data-act="openNotify" id="m-notify">Notifications</button></div></details>
+  <details class="menu brandmenu" id="app-menu"><summary class="brand" id="app-menu-btn" aria-label="Pool &amp; Plan menu">Pool <span>&amp;</span> Plan <i aria-hidden="true">▾</i></summary><div class="pop"><button type="button" data-act="tdAccounts" id="m-accounts">Accounts</button><button type="button" data-act="openCompleted" id="m-done">Completed</button><button type="button" data-act="openImport" id="m-import">Import calendar</button><button type="button" data-act="pomoOpen" id="m-pomo">Pomodoros</button><button type="button" data-act="openNotify" id="m-notify">Notifications</button></div></details>
   <div class="tabs">
     <button class="tab" data-act="view" data-v="board" id="tab-board">Board</button>
     <button class="tab" data-act="view" data-v="plan" id="tab-plan">Plan</button>
@@ -1258,7 +1263,8 @@ function blockHtml(b,k){
       (it.repeat?'<span title="Repeats">'+ic('rep')+'</span>':'')+(rem?'<span title="Reminder">'+ic('bell')+'</span>':'')+(att?'<span title="Attachment">'+ic('clip')+(att>1?att:'')+'</span>':'')+
       labs.map(l=>'<span class="bl" title="Label">'+ic('tag')+esc(l)+'</span>').join('')+'</div>':'';
   const hrs=meta?hours.replace(' ↻',''):hours;
-  return '<div class="blk se p'+i.color+' pr'+i.pr+(i.done?' is-done':'')+'" '+attrs+'>'+
+  const ec=evCat(t);
+  return '<div class="blk se p'+i.color+' pr'+i.pr+(ec?' evc'+ec:'')+(i.done?' is-done':'')+'" '+attrs+'>'+
     '<button class="ck" data-act="toggleSes" data-id="'+b.id+'" data-date="'+k+'" aria-label="Mark time block done">'+(sesDone(it,k)?'✓':'')+'</button>'+
     '<div class="blk-t">'+fmt(i.title)+'</div>'+hrs+meta+'<div class="rs"></div></div>';
 }
@@ -1294,7 +1300,9 @@ function renderCal(){
   cal.scrollTop=keepT;cal.scrollLeft=keepL;
 }
 const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
-const isEvent=t=>!!t&&(t.labels||[]).some(l=>String(l).toLowerCase()==='event');
+const EVKEYS=['event','events','eventh','eventh2'];   // event, eventS, eventH, eventH2: all events, each with its calendar colour
+const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0&&!c)c=i+1});return c};
+const isEvent=t=>evCat(t)>0;
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
 function untimedEvents(keys){
   const out=[];
@@ -1306,7 +1314,7 @@ function untimedEvents(keys){
   });
   return out;
 }
-const chipCls=t=>{const p=projOf(t);return 'chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)};
+const chipCls=t=>{const p=projOf(t),c=evCat(t);return 'chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+(c?' evc'+c:'')};
 function renderMonth(cal){
   const a=new Date(st.anchor),first=new Date(a.getFullYear(),a.getMonth(),1),start=monday(first),today=tdy();
   const last=new Date(a.getFullYear(),a.getMonth()+1,0),weeks=Math.ceil((diffDays(ymd(start),ymd(last))+1)/7);
@@ -1937,6 +1945,180 @@ async function attUpload(id,files){
 }
 form.addEventListener('change',e=>{if(e.target.id==='att-file'&&e.target.files.length)attUpload(e.target.dataset.id,[...e.target.files])});
 
+
+/* ---------- Import a calendar file (.ics), e.g. exported from Proton Calendar, as events in Todoist (a one-time copy) ---------- */
+const EVCATS=[['event','Event'],['eventS','EventS'],['eventH','EventH'],['eventH2','EventH2']];
+function icsParse(text){
+  const lines=String(text||'').replace(/\r?\n[ \t]/g,'').split(/\r?\n/),evs=[];let cur=null;
+  for(const ln of lines){
+    if(ln==='BEGIN:VEVENT'){cur={};continue}
+    if(ln==='END:VEVENT'){if(cur)evs.push(cur);cur=null;continue}
+    if(!cur)continue;
+    const i=ln.indexOf(':');if(i<0)continue;
+    const parts=ln.slice(0,i).split(';'),N=parts[0].toUpperCase(),p={},v=ln.slice(i+1);
+    parts.slice(1).forEach(x=>{const j=x.indexOf('=');if(j>0)p[x.slice(0,j).toUpperCase()]=x.slice(j+1).replace(/^"|"$/g,'')});
+    if(N==='EXDATE'){(cur.EXDATE=cur.EXDATE||[]).push(...v.split(',').map(x=>({v:x,p:p})));continue}
+    cur[N]={v:v,p:p};
+  }
+  return evs;
+}
+const icsText=s=>String(s||'').replace(/\\n/gi,'\n').replace(/\\([,;\\])/g,'$1').trim();
+// minutes that time zone `tz` is ahead of UTC at instant `ms`
+function tzOffset(ms,tz){
+  try{const f=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const o={};f.formatToParts(new Date(ms)).forEach(x=>o[x.type]=x.value);
+    return (Date.UTC(+o.year,o.month-1,+o.day,+o.hour%24,+o.minute)-ms)/60000}catch(e){return null}
+}
+// an ICS date or date-time -> {date:'YYYY-MM-DD', min:null|minutes} in your own time zone
+function icsTime(x){
+  if(!x)return null;
+  const m=/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/.exec(String(x.v).trim());if(!m)return null;
+  if(!m[4]||x.p.VALUE==='DATE')return {date:m[1]+'-'+m[2]+'-'+m[3],min:null};
+  let ms=null;const wall=Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5]);
+  if(m[7])ms=wall;
+  else if(x.p.TZID){const off=tzOffset(wall,x.p.TZID);if(off!=null)ms=wall-off*60000}
+  if(ms==null)return {date:m[1]+'-'+m[2]+'-'+m[3],min:+m[4]*60+ +m[5]};   // floating time: as written
+  const d=new Date(ms);return {date:ymd(d),min:d.getHours()*60+d.getMinutes()};
+}
+function icsDur(s){const m=/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/.exec(String(s||''));return m?((+m[1]||0)*10080+(+m[2]||0)*1440+(+m[3]||0)*60+(+m[4]||0)):0}
+const ICSDAY={MO:0,TU:1,WE:2,TH:3,FR:4,SA:5,SU:6};
+function icsRule(str){const r={};String(str||'').split(';').forEach(kv=>{const i=kv.indexOf('=');if(i>0)r[kv.slice(0,i).toUpperCase()]=kv.slice(i+1)});return r}
+// does a repeating rule fall on day k? (daily, weekly, monthly, yearly with the common options)
+function icsMatcher(R,start){
+  const iv=+R.INTERVAL||1,s=pdate(start),sd=s.getDate(),sm=s.getMonth();
+  const bd=(R.BYDAY||'').split(',').filter(Boolean).map(x=>{const m=/^([+-]?\d+)?([A-Z]{2})$/.exec(x);return m?{n:m[1]?+m[1]:0,d:ICSDAY[m[2]]}:null}).filter(Boolean);
+  const bmd=R.BYMONTHDAY?R.BYMONTHDAY.split(',').map(Number):null,bm=R.BYMONTH?R.BYMONTH.split(',').map(n=>+n-1):null;
+  const nthOk=(d,n,w)=>{if(wd(d)!==w)return false;if(n>0)return Math.ceil(d.getDate()/7)===n;const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return Math.ceil((last-d.getDate()+1)/7)===-n};
+  const mdOk=d=>{const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return (bmd||[sd]).some(n=>n>0?d.getDate()===n:d.getDate()===last+n+1)};
+  return k=>{
+    const d=pdate(k);if(k<start)return false;
+    if(R.FREQ==='DAILY')return diffDays(start,k)%iv===0&&(!bd.length||bd.some(x=>x.d===wd(d)));
+    if(R.FREQ==='WEEKLY'){const w=Math.floor(diffDays(ymd(monday(s)),ymd(monday(d)))/7);return w%iv===0&&(bd.length?bd.some(x=>x.d===wd(d)):wd(d)===wd(s))}
+    const months=(d.getFullYear()-s.getFullYear())*12+d.getMonth()-sm;
+    if(R.FREQ==='MONTHLY'){if(months%iv)return false;return bd.length?bd.some(x=>x.n?nthOk(d,x.n,x.d):wd(d)===x.d):mdOk(d)}
+    if(R.FREQ==='YEARLY'){if((d.getFullYear()-s.getFullYear())%iv)return false;if(!(bm||[sm]).includes(d.getMonth()))return false;return bd.length?bd.some(x=>x.n?nthOk(d,x.n,x.d):wd(d)===x.d):mdOk(d)}
+    return false;
+  };
+}
+// The ICS rule as a Pool & Plan repeat, when Todoist can say it the same way; otherwise null (copied as dates)
+function icsRepeat(R,start){
+  if(R.COUNT||R.UNTIL||R.BYSETPOS||R.BYWEEKNO||R.BYYEARDAY||R.BYHOUR||R.BYMINUTE)return null;
+  const iv=+R.INTERVAL||1,days=(R.BYDAY||'').split(',').filter(Boolean);
+  if(R.FREQ==='DAILY'&&!days.length)return {freq:'daily',interval:iv};
+  if(R.FREQ==='WEEKLY'){
+    const ds=days.length?days.map(x=>ICSDAY[x]):[wd(pdate(start))];if(ds.some(x=>x==null))return null;
+    if(iv===1&&ds.length===5&&[0,1,2,3,4].every(x=>ds.includes(x)))return {freq:'weekdays',interval:1};
+    if(iv>1&&ds.length>1)return null;
+    return {freq:'weekly',interval:iv,days:ds.sort()};
+  }
+  if(R.FREQ==='MONTHLY'&&!R.BYMONTH){
+    if(days.length===1){const m=/^([+-]?\d)([A-Z]{2})$/.exec(days[0]);if(!m||iv>1)return null;return {freq:'monthly',interval:1,nth:+m[1],weekday:ICSDAY[m[2]]}}
+    if(days.length)return null;
+    const md=R.BYMONTHDAY?R.BYMONTHDAY.split(','):[String(pdate(start).getDate())];if(md.length>1)return null;
+    return {freq:'monthly',interval:iv,monthDay:+md[0]};
+  }
+  if(R.FREQ==='YEARLY'&&!days.length&&!R.BYMONTHDAY&&(!R.BYMONTH||R.BYMONTH.split(',').length===1))return {freq:'yearly',interval:iv};
+  return null;
+}
+// Turn the file into the events to copy: upcoming ones only (today onwards)
+function icsPlan(text){
+  const today=tdy(),until=ymd(addDays(new Date(),365)),evs=icsParse(text),out=[],skipped={past:0,cancelled:0,changes:0,unsupported:[]};
+  const masters=new Set(evs.filter(e=>e.RRULE&&e.UID).map(e=>e.UID.v));
+  evs.forEach(e=>{
+    if(e.STATUS&&/CANCELLED/i.test(e.STATUS.v)){skipped.cancelled++;return}
+    if(e['RECURRENCE-ID']&&e.UID&&masters.has(e.UID.v)){skipped.changes++;return}   // a changed single occurrence of a repeat
+    const st=icsTime(e.DTSTART);if(!st)return;
+    let en=icsTime(e.DTEND),dur=e.DURATION?icsDur(e.DURATION.v):0;
+    const title=icsText(e.SUMMARY&&e.SUMMARY.v)||'(no title)';
+    const notes=[icsText(e.LOCATION&&e.LOCATION.v)?'📍 '+icsText(e.LOCATION.v):'',icsText(e.DESCRIPTION&&e.DESCRIPTION.v)].filter(Boolean).join('\n\n');
+    let base;
+    if(st.min==null){
+      const days=en&&en.min==null?Math.max(1,diffDays(st.date,en.date)):(dur?Math.max(1,Math.round(dur/1440)):1);
+      base={title:title,notes:notes,time:null,days:days};
+    }else{
+      let mins=en&&en.min!=null?diffDays(st.date,en.date)*1440+en.min-st.min:(dur||60);
+      if(mins>=1440){base={title:title,notes:notes,time:null,days:Math.max(2,diffDays(st.date,en?en.date:ymd(addDays(pdate(st.date),Math.ceil(mins/1440))))+(en&&en.min>0?1:0))}}
+      else base={title:title,notes:notes,time:st.min,dur:Math.max(5,Math.min(mins||60,1440-st.min))};
+    }
+    if(!e.RRULE){
+      const last=ymd(addDays(pdate(st.date),(base.days||1)-1));
+      if(last<today){skipped.past++;return}
+      out.push(Object.assign({date:st.date},base));return;
+    }
+    const R=icsRule(e.RRULE.v),match=icsMatcher(R,st.date),ex=new Set((e.EXDATE||[]).map(x=>{const t=icsTime(x);return t&&t.date}));
+    const rep=icsRepeat(R,st.date);
+    if(rep){   // one repeating task, starting at its next date from today
+      let k=today>st.date?today:st.date,n=0;while(!match(k)&&n<4000){k=ymd(addDays(pdate(k),1));n++}
+      if(n>=4000){skipped.unsupported.push(title);return}
+      out.push(Object.assign({date:k,repeat:rep},base));return;
+    }
+    if(!['DAILY','WEEKLY','MONTHLY','YEARLY'].includes(R.FREQ)||R.BYSETPOS){skipped.unsupported.push(title);return}
+    // copied as separate dates for the next 12 months, respecting COUNT, UNTIL and skipped dates
+    const lim=R.UNTIL?(icsTime({v:R.UNTIL,p:{}})||{}).date||until:until,max=+R.COUNT||1e9;let k=st.date,count=0,guard=0,any=false;
+    while(k<=until&&k<=lim&&count<max&&guard<20000){
+      if(match(k)){count++;if(k>=today&&!ex.has(k)){out.push(Object.assign({date:k},base));any=true}}
+      k=ymd(addDays(pdate(k),1));guard++;
+    }
+    if(!any)skipped.past++;
+  });
+  return {events:out,skipped:skipped};
+}
+let IMP=null;
+function openImport(){
+  IMP=null;
+  if(!TD.on){openDlg('Import calendar','<div class="hint">Connect Todoist first: imported events are saved there.</div>',null);return}
+  openDlg('Import calendar',
+    '<div class="hint">Copies a calendar file into Todoist once, as events. In Proton Calendar: <b>Settings → All settings → Import/export → Download ICS</b>, one file per calendar. Only events from today onwards are copied; repeating ones stay repeating when Todoist can say it the same way.</div>'+
+    '<label class="fld"><span>Calendar file (.ics)</span><input type="file" id="imp-file" accept=".ics,text/calendar"></label>'+
+    '<label class="fld"><span>Category</span><select id="imp-cat">'+EVCATS.map(c=>'<option value="'+c[0]+'">'+c[0]+'</option>').join('')+'</select></label>'+
+    '<div class="hint" id="imp-sum" role="status">Pick a file to see what will be copied.</div>',
+    ()=>{runImport();return false},{saveLabel:'Import',focus:false});
+  $('#dlg-save').disabled=true;
+}
+form.addEventListener('change',e=>{
+  if(e.target.id==='imp-cat'){const s=$('#imp-sum');if(s&&IMP)s.innerHTML=impSummary();return}
+  if(e.target.id!=='imp-file'||!e.target.files.length)return;
+  const f=e.target.files[0];f.text().then(txt=>{
+    try{IMP=icsPlan(txt)}catch(err){IMP=null}
+    $('#imp-sum').innerHTML=IMP?impSummary():'This file couldn’t be read as a calendar.';
+    $('#dlg-save').disabled=!(IMP&&IMP.events.length);
+  });
+});
+function impSummary(){
+  const e=IMP.events,s=IMP.skipped,rep=e.filter(x=>x.repeat).length,cat=$('#imp-cat').value,list=EVCATS.find(c=>c[0]===cat)[1];
+  return '<b>'+e.length+(e.length===1?' event':' events')+'</b> to copy'+(rep?' ('+rep+' repeating)':'')+', into the list <b>'+esc(list)+'</b> on the CALENDAR board, labelled <b>'+esc(cat)+'</b>.'+
+    (s.past?'<br>'+s.past+' past '+(s.past===1?'event':'events')+' skipped.':'')+
+    (s.cancelled?'<br>'+s.cancelled+' cancelled skipped.':'')+
+    (s.changes?'<br>'+s.changes+' one-off changes to repeating events can’t be copied; the repeat keeps its usual time.':'')+
+    (s.unsupported.length?'<br>Couldn’t copy these repeats: '+esc(s.unsupported.slice(0,5).join(', '))+(s.unsupported.length>5?'…':'')+'.':'');
+}
+async function runImport(){
+  if(!IMP||!IMP.events.length)return;
+  const cat=$('#imp-cat').value,title=EVCATS.find(c=>c[0]===cat)[1],btn=$('#dlg-save');btn.disabled=true;btn.textContent='Importing…';
+  const findList=()=>{const b=items.get('b:CALENDAR');const s=b&&(b.sections||[]).find(x=>x.name===title&&accOfKey(x.id)===0);return s?s.id:null};
+  let sec=findList();
+  if(!sec){
+    const r=window.PPMap.listCommands('add',TD.structs[0],tdUuid,{board:'CALENDAR',title:title});
+    if(r.refused.length){toast(refusedMsg(r.refused[0]));btn.textContent='Import';btn.disabled=false;return}
+    tdSend(0,r.commands);
+    for(let i=0;i<40&&!(sec=findList());i++){await new Promise(z=>setTimeout(z,500));if(!TD.queue.length&&!TD.sending&&i%4===3)await tdSync(false).catch(()=>{})}
+    if(!sec){toast('The CALENDAR list couldn’t be created in Todoist. Try again in a minute.');btn.textContent='Import';btn.disabled=false;return}
+  }
+  // don't copy what is already there (same name on the same day)
+  const have=new Set(byKind('task').filter(e=>e[1].sectionId===sec).map(([id,t])=>{const s=items.get('s:'+id);return plainText(t.title)+'|'+((s&&s.repeat)||t.recur?'R':(s?s.date:t.day))}));
+  let n=0,dup=0;const ord0=nextOrder();
+  IMP.events.forEach(ev=>{
+    if(have.has(ev.title+'|'+(ev.repeat?'R':ev.date))){dup++;return}
+    const id=nid(),task={kind:'task',title:ev.title,notes:ev.notes,projectId:'b:CALENDAR',sectionId:sec,parentId:'',priority:4,labels:[cat],day:'',deadline:'',est:ev.dur||60,done:false,order:ord0+n};
+    if(ev.time==null){task.day=ev.date;if(ev.repeat)task.recur=ev.repeat;if(ev.days>1)task.days=ev.days}
+    else{const s={kind:'session',taskId:id,date:ev.date,start:ev.time,dur:ev.dur,done:false,remind:-1};if(ev.repeat)s.repeat=ev.repeat;items.set('s:'+id,s)}
+    items.set(id,task);TD.dirty.set(id,true);n++;
+  });
+  touch();render();clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);
+  dlg.close();
+  toast(n+(n===1?' event':' events')+' copied to CALENDAR / '+title+(dup?' ('+dup+' already there)':'')+'.');
+}
+
 form.addEventListener('input',e=>{if(e.target.id==='done-q'){DONE.q=e.target.value;doneRender()}});
 form.addEventListener('change',e=>{if(e.target.id==='done-board'){DONE.board=e.target.value;doneRender()}});
 
@@ -2260,6 +2442,7 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  openImport:()=>openImport(),
   attDel:b=>{const id=b.dataset.id,t=items.get(id);if(!t)return;const a=(t.attachments||[])[Number(b.dataset.i)];if(!a)return;
     if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Remove?';b.classList.add('armed');return}
     if(a.noteId)tdSend(tdAccOfTask(id,t),[{type:'note_delete',uuid:tdUuid(),args:{id:a.noteId}}]);
