@@ -106,10 +106,11 @@ These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but
 
 ### Events
 
-- A task with the label `ev`, `evSug`, `evCump` or `evHome` is an **event**; every other task is a task.
+- A task with the label `ev`, `evS`, `evC` or `evH` is an **event**; every other task is a task.
 - Events without a time show in the calendar row (multi-day ones as bars); events with a time show in the agenda.
-- Todoist keeps at most 24 hours of length, so a multi-day length is kept as a last line in the description: `↔ 3 days`.
-- In the calendar each type has its colour: ev purple, evSug mustard-khaki, evCump red (as P1), evHome brown. A priority (P1–P3) replaces it. Lists are not coloured.
-- Clicking an empty spot in the month view adds an event on that day; you pick its type. It goes to `CALENDAR <Type>` (Ev, EvSug, EvCump, EvHome).
-- **Import calendar** (Pool & Plan menu) copies an `.ics` file or calendar link once, for example a calendar from Proton, into the same lists. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing again skips what is already there and corrects lengths and times.
-- The earlier labels (event, eventS, eventC, eventH, eventH2) are renamed once, automatically, with their CALENDAR lists; eventH2 joins evHome.
+- Events lasting more than one day appear only on the calendar, never in lists.
+- Todoist keeps at most 24 hours of length, so a multi-day duration is kept as a last line in the description: `↔ 3 days`.
+- In the calendar each type has its colour: ev purple, evS mustard-khaki, evC red (as P1), evH brown. A priority (P1–P3) replaces it. Lists are not coloured.
+- Clicking an empty spot in the month view adds an event on that day; you pick its type. It goes to `CALENDAR <Type>` (Ev, EvS, EvC, EvH).
+- **Import calendar** (Pool & Plan menu) copies an `.ics` file or calendar link once, for example a calendar from Proton, into the same lists. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing again skips what is already there and corrects durations and times.
+- Earlier labels (event, eventS, eventC, eventH, eventH2, evSug, evCump, evHome) and their CALENDAR lists are renamed once, automatically.

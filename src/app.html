@@ -1194,6 +1194,7 @@ function cardHtml(id,t,all){
     (subs.length&&subOpen?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
 }
 function inLane(l,id,t){
+  if((t.days||1)>1&&isEvent(t))return false;    // multi-day events live on the calendar only
   if(l.type==='proj')return pidOf(t)===l.id&&(st.proj!=='@periodic'||!!t.recur||sessionsOf(id).some(e=>e[1].repeat));
   if(l.type==='sec')return pidOf(t)===st.proj&&secOf(t)===l.id;
   if(l.type==='label')return l.id?(t.labels||[]).includes(l.id):!(t.labels||[]).length;
@@ -1302,7 +1303,7 @@ function renderCal(){
   cal.scrollTop=keepT;cal.scrollLeft=keepL;
 }
 const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
-const EVKEYS=['ev','evsug','evcump','evhome'];   // ev, evSug, evCump, evHome: all events, each with its calendar colour
+const EVKEYS=['ev','evs','evc','evh'];   // ev, evS, evC, evH: all events, each with its calendar colour
 const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0&&!c)c=i+1});return c};
 const isEvent=t=>evCat(t)>0;
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
@@ -1851,7 +1852,7 @@ function syncForm(){
   if(el.projectId&&el.sectionId&&el.sectionId.dataset.forp!==el.projectId.value){el.sectionId.innerHTML=secOpts(el.projectId.value,el.sectionId.dataset.cur);el.sectionId.dataset.forp=el.projectId.value}
   form.querySelectorAll('[data-when]').forEach(n=>{n.hidden=!n.dataset.when.split(' ').every(x=>fl.has(x))});
   form.querySelectorAll('[data-t]').forEach(n=>{const i=form.querySelector('.tf[data-g="'+n.dataset.t+'"] input'),noT=!!i&&!i.value;if(noT)n.hidden=true;else if(!n.dataset.when)n.hidden=false});
-  whenUpdate();
+  whenUpdate();if($('#ne-dur'))durSync('ne');
 }
 form.addEventListener('change',syncForm);
 $('#app-menu').addEventListener('toggle',e=>{const d=e.target;if(!d.open)return;const r=$('#app-menu-btn').getBoundingClientRect(),pop=d.querySelector('.pop');pop.style.left=Math.max(8,r.left)+'px';pop.style.top=(r.bottom+4)+'px'});
@@ -1963,7 +1964,7 @@ form.addEventListener('change',e=>{if(e.target.id==='att-file'&&e.target.files.l
 
 
 /* ---------- Import a calendar file (.ics), e.g. exported from Proton Calendar, as events in Todoist (a one-time copy) ---------- */
-const EVCATS=[['ev','Ev'],['evSug','EvSug'],['evCump','EvCump'],['evHome','EvHome']];
+const EVCATS=[['ev','Ev'],['evS','EvS'],['evC','EvC'],['evH','EvH']];
 function icsParse(text){
   const lines=String(text||'').replace(/\r?\n[ \t]/g,'').split(/\r?\n/),evs=[];let cur=null;
   for(const ln of lines){
@@ -2136,9 +2137,9 @@ async function ensureCalList(title){
   return sec;
 }
 
-/* ---------- one-time rename of the old event labels and their CALENDAR lists (event → ev, eventS → evSug, eventC → evCump, eventH/eventH2 → evHome) ---------- */
-const OLDEV={event:'ev',events:'evSug',eventc:'evCump',eventh:'evHome',eventh2:'evHome'};
-const OLDLIST={Event:'Ev',EventS:'EvSug',EventC:'EvCump',EventH:'EvHome',EventH2:'EvHome'};
+/* ---------- one-time rename of earlier event labels and their CALENDAR lists to ev, evS, evC, evH ---------- */
+const OLDEV={event:'ev',events:'evS',eventc:'evC',eventh:'evH',eventh2:'evH',evsug:'evS',evcump:'evC',evhome:'evH'};
+const OLDLIST={Event:'Ev',EventS:'EvS',EventC:'EvC',EventH:'EvH',EventH2:'EvH',EvSug:'EvS',EvCump:'EvC',EvHome:'EvH'};
 function tdMigrateEventLabels(){
   if(!TD.on||!loaded||TD.migrating)return;
   let n=0;
@@ -2165,10 +2166,36 @@ function tdMigrateEventLabels(){
   touch();render();
   if(cmds.length)tdSend(0,cmds);
   clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);
-  toast('Event labels renamed (ev, evSug, evCump, evHome)'+(n?' on '+n+(n===1?' task':' tasks'):'')+'.');
+  toast('Event labels renamed (ev, evS, evC, evH)'+(n?' on '+n+(n===1?' task':' tasks'):'')+'.');
 }
 
 /* ---------- New event: from an empty spot in the month view ---------- */
+const DAYOPTS=[1,2,3,4,5,6,7,8,9,10,12,14,21,28];
+// One "Duration" field: minutes and hours when a time is set; days otherwise, or a last day picked on a calendar
+function durField(pre,dur,days){
+  days=Math.max(1,days||1);const dl=DAYOPTS.includes(days)?DAYOPTS:DAYOPTS.concat([days]).sort((a,b)=>a-b);
+  return '<div class="fld dur-fld"><span>Duration</span>'+
+    '<select name="dur" id="'+pre+'-dur" aria-label="Duration">'+durOpts(dur)+'</select>'+
+    '<select name="days" id="'+pre+'-days" aria-label="Duration in days" data-prev="'+days+'">'+opts(dl.map(n=>[n,n===1?'1 day':n+' days']),days)+'<option value="pick">Pick end date…</option></select>'+
+    '<input type="date" id="'+pre+'-dend" hidden aria-label="Last day"></div>';
+}
+function durSync(pre){
+  const t=$('#'+pre+'-time'),m=$('#'+pre+'-dur'),d=$('#'+pre+'-days'),e=$('#'+pre+'-dend');if(!m||!d)return;
+  const timed=!!(t&&t.value);m.hidden=!timed;d.hidden=timed;if(timed&&e)e.hidden=true;
+}
+form.addEventListener('change',e=>{
+  const id=e.target.id||'',mm=/^(f|ne)-(days|dend)$/.exec(id);if(!mm)return;
+  const pre=mm[1],sel=$('#'+pre+'-days'),end=$('#'+pre+'-dend'),day=($('#'+pre+'-day')||{}).value||tdy();
+  if(mm[2]==='days'){
+    if(sel.value==='pick'){sel.value=sel.dataset.prev||'1';end.min=day;end.value=ymd(addDays(pdate(day),(+sel.value||1)-1));end.hidden=false;try{end.showPicker()}catch(x){end.focus()}}
+    else{sel.dataset.prev=sel.value;end.hidden=true}
+    return;
+  }
+  if(!end.value)return;
+  const n=Math.max(1,diffDays(day,end.value)+1);
+  if(![...sel.options].some(o=>o.value===String(n))){const o=document.createElement('option');o.value=String(n);o.textContent=n+' days';const before=[...sel.options].find(x=>x.value==='pick'||+x.value>n);sel.insertBefore(o,before)}
+  sel.value=String(n);sel.dataset.prev=String(n);end.hidden=true;syncForm();
+});
 function openNewEvent(day){
   curTask=null;reopen=null;
   openDlg('New event',
@@ -2176,13 +2203,12 @@ function openNewEvent(day){
     '<div class="fld"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"'+(i===0?' checked':'')+'><span>'+c[0]+'</span></label>').join('')+'</div></div>'+
     '<div class="row"><label class="fld"><span>Day</span><input type="date" name="day" id="ne-day" value="'+esc(day)+'"></label>'+
     '<label class="fld"><span>Time</span>'+timeFld('time','ne-time','','m')+'</label>'+
-    '<label class="fld" data-t="m"><span>Length</span><select name="dur">'+durOpts(60)+'</select></label>'+
-    '<label class="fld" id="ne-days-wrap"><span>Days</span><select name="days">'+opts([1,2,3,4,5,6,7,8,9,10,12,14,21,28].map(n=>[n,n===1?'1 day':n+' days']),1)+'</select></label></div>',
+    durField('ne',60,1)+'</div>',
     fd=>{createEvent(fd);return false},{saveLabel:'Add event'});
 }
 async function createEvent(fd){
   const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return}
-  const cat=fd.get('evtype')||'ev',day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Number(fd.get('days'))||1;
+  const cat=fd.get('evtype')||'ev',day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Math.max(1,Number(fd.get('days'))||1);
   if(!TD.on){const id=addTask(title,{labels:[cat],day:time?'':day,days:time?1:days});if(time)addSession(id,day,toMin(time),dur,null,-1);dlg.close();return}
   const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Adding…';
   const sec=await ensureCalList(EVCATS.find(c=>c[0]===cat)[1]);
@@ -2193,8 +2219,7 @@ async function createEvent(fd){
   items.set(id,task);touch();render();tdMarkDirty(id);
   dlg.close();toast(title+' added.');
 }
-form.addEventListener('input',e=>{if(e.target.id==='ne-time'){const w=$('#ne-days-wrap');if(w)w.hidden=!!e.target.value}});
-form.addEventListener('change',e=>{if(e.target.id==='ne-time'){const w=$('#ne-days-wrap');if(w)w.hidden=!!e.target.value}});
+form.addEventListener('input',e=>{if(e.target.id==='ne-time')durSync('ne')});
 
 async function runImport(){
   if(!IMP||!IMP.events.length)return;
@@ -2287,8 +2312,8 @@ function whenUpdate(){
   const b=$('#f-when');if(!b)return;
   const d=$('#f-day').value,t=$('#f-time').value,du=Number(($('#f-dur')||{}).value)||60,rs=$('#f-rep'),rv=rs?rs.value:'',rt=$('#f-reptext');
   if(rt)rt.parentNode.hidden=rv!=='__custom';
-  const timed=!!(d&&t),dw=$('#f-days-wrap'),nd=Number(($('#f-days')||{}).value)||1;
-  if(dw)dw.hidden=timed||!d;
+  const timed=!!(d&&t),nd=Number(($('#f-days')||{}).value)||1;
+  durSync('f');
   if(b.dataset.timed!==String(timed)){b.dataset.timed=String(timed);remBox()}
   if(!d){b.className='when';b.innerHTML=ic('cal')+'<span class="hint">No date</span>';return}
   let txt=dateName(d);
@@ -2314,9 +2339,9 @@ function openTask(id,preset){
     '<input type="text" name="title" id="f-title" class="tk-title" value="'+esc(t.title)+'" placeholder="Task name" aria-label="Task name" autocomplete="off">'+
     '<div class="nview" id="f-nview" tabindex="0" role="button" aria-label="Edit description">'+(t.notes?fmtBlock(t.notes):'<span class="hint">Description</span>')+'</div>'+
     '<textarea name="notes" id="f-notes" rows="6" hidden aria-label="Description">'+esc(t.notes||'')+'</textarea>';
-  if(id&&TD.on)main+='<h3>Attachments</h3><div class="att-box" id="att-box" data-id="'+esc(id)+'">'+attHtml(id)+'</div>';
   if(id&&!parent)main+='<h3>Sub-tasks</h3>'+(subs.length?'<div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete sub-task">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>':'')+
     '<div class="subadd"><input type="text" name="subTitle" id="f-subtitle" placeholder="Add sub-task" aria-label="New sub-task" autocomplete="off"><button type="button" class="mini" data-act="addSub" data-id="'+id+'" id="f-addsub">Add</button></div>';
+  if(id&&TD.on)main+='<h3>Attachments</h3><div class="att-box" id="att-box" data-id="'+esc(id)+'">'+attHtml(id)+'</div>';
   const quick=[['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['nextweek','Next week'],['none','No date']];
   const side=(parent?'':'<label class="fld"><span>Section</span><select name="projectId" id="f-project"><option value="">Inbox</option>'+opts(projs.map(([pid,p])=>[pid,p.name]),pidOf(t))+'</select></label>'+
       '<label class="fld"><span>List</span><select name="sectionId" id="f-section" data-cur="'+esc(t.sectionId||'')+'"></select></label>')+
@@ -2325,8 +2350,7 @@ function openTask(id,preset){
         '<div class="qd">'+quick.map(q=>'<button type="button" class="mini" data-act="whenQuick" data-d="'+q[0]+'">'+q[1]+'</button>').join('')+'</div>'+
         '<label class="fld"><span>Day</span><input type="date" name="day" id="f-day" value="'+esc(fDate)+'"></label>'+
         '<div class="row"><label class="fld"><span>Time</span>'+timeFld('time','f-time',fTime,'m')+'</label>'+
-        '<label class="fld" data-t="m"><span>Length</span><select name="dur" id="f-dur">'+durOpts(fDur)+'</select></label>'+
-        '<label class="fld" id="f-days-wrap"><span>Days</span><select name="days" id="f-days">'+opts([1,2,3,4,5,6,7,8,9,10,12,14,21,28].map(n=>[n,n===1?'1 day':n+' days']),fDays)+'</select></label></div>'+
+        durField('f',fDur,fDays)+'</div>'+
         '<label class="fld"><span>Repeat</span><select name="rep" id="f-rep">'+repOpts(fRep)+'</select></label>'+
         '<label class="fld" hidden><span>Repeat, as typed in Todoist</span><input type="text" name="repText" id="f-reptext" placeholder="every last friday" autocomplete="off" value="'+esc(fRep&&fRep.freq==='custom'?fRep.text:'')+'"></label>'+
         '<button type="button" class="mini" data-act="whenToggle">Done</button>'+
