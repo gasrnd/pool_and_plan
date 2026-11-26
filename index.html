@@ -78,6 +78,8 @@ button.pomo.due::after{background:var(--accent)}
 button.pomo.away{opacity:.6}
 button.pomo.off{font-style:italic}
 .chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+.cfm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid color-mix(in srgb,var(--pri1) 45%,var(--line));background:color-mix(in srgb,var(--pri1) 7%,var(--surface));border-radius:8px}
+.cfm>span{flex:1 1 14em;min-width:0}
 .att-box{display:flex;flex-direction:column;gap:4px}
 .att{display:flex;align-items:center;gap:8px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--surface);min-width:0}
 .att img{width:36px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 36px}
@@ -219,6 +221,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .is-done .card-t,.is-done>span{text-decoration:line-through;color:var(--mute)}
 .card-m{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;color:var(--mute);font-size:11px;margin-top:3px;padding-left:24px}
 .card-m .late{color:var(--now);font-weight:600}
+.tk-head{display:flex;align-items:center;gap:10px}.tk-head .tk-title{flex:1 1 auto;min-width:0;margin-left:0}
+.tk.big{width:21px;height:21px;font-size:12px;margin-top:0}
 .tk{flex:none;width:17px;height:17px;padding:0;border-radius:50%;border:1.5px solid var(--prc,var(--mute));background:var(--surface);font-size:11px;line-height:1;color:var(--ink);margin-top:1px}
 .pr1{--prc:var(--pri1)}.pr2{--prc:var(--pri2)}.pr3{--prc:var(--pri3)}
 .tk.pr1,.tk.pr2,.tk.pr3{border-width:2px;background:color-mix(in srgb,var(--prc) 16%,var(--surface))}
@@ -2344,7 +2348,8 @@ function openTask(id,preset){
   const bo=items.get(pidOf(t)),sec=bo&&(bo.sections||[]).find(x=>x.id===t.sectionId);
   const crumb=!id?'New task':bo?bo.name+(sec?' / '+sec.name:''):'Inbox';
   let main=(parent?'<div class="li sub-of"><span>Sub-task of '+fmt(parent.title)+'</span><button type="button" data-act="openTask" data-id="'+t.parentId+'">Open</button></div>':'')+
-    '<input type="text" name="title" id="f-title" class="tk-title" value="'+esc(t.title)+'" placeholder="Task name" aria-label="Task name" autocomplete="off">'+
+    '<div class="tk-head">'+(id?'<button type="button" class="tk big pr'+(t.priority||4)+'" data-act="toggleTask" data-id="'+id+'" aria-label="'+(isDone(t)?'Reopen task':'Complete task')+'">'+(isDone(t)?'✓':'')+'</button>':'')+
+    '<input type="text" name="title" id="f-title" class="tk-title" value="'+esc(t.title)+'" placeholder="Task name" aria-label="Task name" autocomplete="off"></div>'+
     '<div class="nview" id="f-nview" tabindex="0" role="button" aria-label="Edit description">'+(t.notes?fmtBlock(t.notes):'<span class="hint">Description</span>')+'</div>'+
     '<textarea name="notes" id="f-notes" rows="6" hidden aria-label="Description">'+esc(t.notes||'')+'</textarea>';
   if(id&&!parent)main+='<h3>Sub-tasks</h3>'+(subs.length?'<div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete sub-task">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>':'')+
@@ -2367,7 +2372,7 @@ function openTask(id,preset){
     '<div class="fld"><span>Labels</span><input type="hidden" name="labels" id="f-labels" value="'+esc((t.labels||[]).join(' '))+'"><div class="lbl" id="lbl-box"></div></div>'+
     '<div class="fld"><span>Reminders</span><input type="hidden" name="reminders" id="f-rems" value="'+esc(JSON.stringify(rems))+'"><div class="lbl" id="rem-box"></div></div>';
   const body='<div class="tk-grid"><div class="tk-main">'+main+'</div><aside class="tk-side" aria-label="Task details">'+side+'</aside></div>';
-  openDlg(crumb,body,fd=>saveTask(id,fd),{wide:true,delId:id,extra:id?'<button type="button" data-act="toggleTask" data-id="'+id+'" id="dlg-complete">'+(isDone(t)?'Reopen':'Complete')+'</button>':''});
+  openDlg(crumb,body,fd=>saveTask(id,fd),{wide:true,delId:id});
   labelBox();remBox();whenUpdate();
 }
 form.addEventListener('change',e=>{
@@ -2576,11 +2581,23 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
+// Every delete asks first, in a bar next to the button: Cancel / Delete
+function confirmDel(b,text,yesLabel,yes){
+  document.querySelectorAll('.cfm').forEach(x=>x.remove());
+  const host=b.closest('.foot')||b.closest('.att,.li,.acc')||b.parentNode,c=document.createElement('div');
+  c.className='cfm';c.setAttribute('role','alertdialog');c.setAttribute('aria-label','Confirm');
+  c.innerHTML='<span>'+esc(text)+'</span><button type="button" class="cfm-no">Cancel</button><button type="button" class="danger cfm-yes">'+esc(yesLabel||'Delete')+'</button>';
+  host.insertAdjacentElement(host.classList.contains('foot')?'beforebegin':'afterend',c);
+  c.querySelector('.cfm-no').onclick=()=>{c.remove();b.focus()};
+  c.querySelector('.cfm-yes').onclick=()=>{c.remove();yes()};
+  c.querySelector('.cfm-no').focus();
+}
+const confirmed=(b,text,label)=>{if(b.dataset.ok)return true;confirmDel(b,text,label,()=>{b.dataset.ok='1';b.click()});return false};
 const ACT={
   impLoad:()=>impLoad(),
   openImport:()=>openImport(),
   attDel:b=>{const id=b.dataset.id,t=items.get(id);if(!t)return;const a=(t.attachments||[])[Number(b.dataset.i)];if(!a)return;
-    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Remove?';b.classList.add('armed');return}
+    if(!confirmed(b,'Remove \u201c'+a.name+'\u201d from this task? It is deleted from Todoist.','Remove'))return;
     if(a.noteId)tdSend(tdAccOfTask(id,t),[{type:'note_delete',uuid:tdUuid(),args:{id:a.noteId}}]);
     items.set(id,Object.assign({},t,{attachments:t.attachments.filter(x=>x!==a)}));touch();render();attRefresh(id);toast('Attachment removed.')},
   hideBoard:b=>{const n=b.dataset.v;TD.layout.hidden=[...new Set((TD.layout.hidden||[]).concat([n]))];tdSaveLayout();if(st.proj==='b:'+n){st.proj='@today';saveUi()}tdBuild();toast(n+' is hidden here. Its project in Todoist is untouched.')},
@@ -2639,13 +2656,13 @@ const ACT={
     });
   },
   tdRemove:(b,id)=>{
-    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to remove';return}
+    if(!confirmed(b,'Remove this account from Pool & Plan? Its Todoist data is untouched.','Remove'))return;
     TD.accounts.splice(+id,1);tdSave();
     if(!TD.accounts.length){tdStop();dlg.close();items=new Map();touch();render();showConnect('All accounts removed. Paste a token to connect again.');return}
     tdBuild();openAccounts();
   },
   editSection:(b,id)=>openSection(id),
-  delSection:(b,id)=>{if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Confirm: delete list (tasks are kept)';return}const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
+  delSection:(b,id)=>{if(!confirmed(b,'Delete this list? Its tasks are kept and move out of it.'))return;const p=items.get(st.proj);if(p)put(st.proj,Object.assign({},p,{sections:(p.sections||[]).filter(x=>x.id!==id)}));dlg.close()},
   cancel:()=>dlg.close(),
   lblDel:(b,id)=>{const h=$('#f-labels');if(h){h.value=lblCur().filter(x=>x!==id).join(' ');labelBox()}},
   laneAdd:b=>{st.addIn=b.dataset.ltype+'|'+b.dataset.lane;renderBoard();const i=$('#lane-add-input');if(i)i.focus()},
@@ -2653,7 +2670,7 @@ const ACT={
   dismiss:(b,id)=>{const i=alerts.findIndex(a=>a.key===id);if(i>=0)alerts.splice(i,1);renderAlerts()},
   toggleTask:(b,id)=>{
     const inDlg=!!b.closest('dialog'),re=reopen;
-    if(inDlg&&curTask&&curTask!==id)saveTask(curTask,new FormData(form));
+    if(inDlg&&curTask){saveTask(curTask,new FormData(form));if(TD.on&&TD.dirty.size){clearTimeout(TD.dirtyTimer);tdFlushDirty()}}   // edits go first, then the completion
     const t=items.get(id);if(!t)return;
     if(isDone(t))put(id,Object.assign({},t,{done:false,status:''}));else completeTask(id);
     if(inDlg){if(curTask===id)dlg.close();else if(re)re()}
@@ -2666,12 +2683,12 @@ const ACT={
     if(!was)fire('sessionDone',s.taskId);
   },
   skipOcc:(b,id)=>{const it=items.get(id);if(it)put(id,Object.assign({},it,{skip:(it.skip||[]).concat([b.dataset.date])}));dlg.close()},
-  clearEx:()=>{[...items].forEach(e=>{if(e[1]&&e[1].example)del(e[0])});toast('Examples cleared.')},
+  clearEx:b=>{if(!confirmed(b,'Clear all example tasks, events and routine blocks?','Clear'))return;[...items].forEach(e=>{if(e[1]&&e[1].example)del(e[0])});toast('Examples cleared.')},
   openTask:(b,id)=>{if(curTask&&curTask!==id)saveTask(curTask,new FormData(form));openTask(id)},
-  delNow:(b,id)=>{const re=reopen;if(curTask)saveTask(curTask,new FormData(form));del(id);if(re)re()},
+  delNow:(b,id)=>{if(!confirmed(b,'Remove this rule?','Remove'))return;const re=reopen;if(curTask)saveTask(curTask,new FormData(form));del(id);if(re)re()},
   del:(b,id)=>{
-    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Confirm delete';return}
     const it=items.get(id);
+    if(!confirmed(b,it&&it.kind==='project'?'Delete the board \u201c'+it.name+'\u201d?':'Delete \u201c'+plainText((it&&it.title)||'this')+'\u201d'+(byKind('task').some(e=>e[1].parentId===id)?' and its sub-tasks':'')+'? This can\u2019t be undone.'))return;
     if(it&&it.kind==='task')delTask(id);else{if(it&&it.kind==='project'){st.proj='@today';saveUi()}del(id)}
     dlg.close();
   },
