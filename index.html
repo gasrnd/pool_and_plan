@@ -281,7 +281,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .blk.se,.chip.se{border-color:var(--prc,var(--mute))}
 .allday .chip.se{color:var(--prc,var(--mute));font-weight:400}
 .blk.se{color:var(--ink)}
-.evc1.pr4{--prc:var(--ev1)}.evc2.pr4{--prc:var(--ev2)}.evc3.pr4{--prc:var(--ev3)}.evc4.pr4{--prc:var(--ev4)}
+.evc1.pr4{--prc:var(--ev1)}.evc2.pr4{--prc:var(--ev2)}.evc3.pr4{--prc:var(--ev3)}.evc4.pr4{--prc:var(--ev4)}.evc5.pr4{--prc:var(--pri1)}
 .blk.se.pr4[class*=evc],.chip.se.pr4[class*=evc]{background:color-mix(in srgb,var(--prc) 12%,var(--surface))}
 .blk.se.pr1,.blk.se.pr2,.blk.se.pr3,.chip.se.pr1,.chip.se.pr2,.chip.se.pr3{background:color-mix(in srgb,var(--prc) 6%,var(--surface))}
 .blk.se.is-done{opacity:.55}
@@ -1300,7 +1300,7 @@ function renderCal(){
   cal.scrollTop=keepT;cal.scrollLeft=keepL;
 }
 const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
-const EVKEYS=['event','events','eventh','eventh2'];   // event, eventS, eventH, eventH2: all events, each with its calendar colour
+const EVKEYS=['event','events','eventh','eventh2','eventc'];   // event, eventS, eventH, eventH2, eventC: all events, each with its calendar colour
 const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0&&!c)c=i+1});return c};
 const isEvent=t=>evCat(t)>0;
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
@@ -1947,7 +1947,7 @@ form.addEventListener('change',e=>{if(e.target.id==='att-file'&&e.target.files.l
 
 
 /* ---------- Import a calendar file (.ics), e.g. exported from Proton Calendar, as events in Todoist (a one-time copy) ---------- */
-const EVCATS=[['event','Event'],['eventS','EventS'],['eventH','EventH'],['eventH2','EventH2']];
+const EVCATS=[['event','Event'],['eventS','EventS'],['eventC','EventC'],['eventH','EventH'],['eventH2','EventH2']];
 function icsParse(text){
   const lines=String(text||'').replace(/\r?\n[ \t]/g,'').split(/\r?\n/),evs=[];let cur=null;
   for(const ln of lines){
@@ -2070,19 +2070,34 @@ function openImport(){
   openDlg('Import calendar',
     '<div class="hint">Copies a calendar file into Todoist once, as events. In Proton Calendar: <b>Settings → All settings → Import/export → Download ICS</b>, one file per calendar. Only events from today onwards are copied; repeating ones stay repeating when Todoist can say it the same way.</div>'+
     '<label class="fld"><span>Calendar file (.ics)</span><input type="file" id="imp-file" accept=".ics,text/calendar"></label>'+
+    '<div class="fld"><span>or a calendar link</span><div class="row"><input type="url" id="imp-url" placeholder="https://calendar.proton.me/api/calendar/v1/url/\u2026" autocomplete="off" spellcheck="false" aria-label="Calendar link"><button type="button" data-act="impLoad">Read link</button></div></div>'+
     '<label class="fld"><span>Category</span><select id="imp-cat">'+EVCATS.map(c=>'<option value="'+c[0]+'">'+c[0]+'</option>').join('')+'</select></label>'+
     '<div class="hint" id="imp-sum" role="status">Pick a file to see what will be copied.</div>',
     ()=>{runImport();return false},{saveLabel:'Import',focus:false});
   $('#dlg-save').disabled=true;
 }
+function impShow(txt){
+  try{IMP=icsPlan(txt)}catch(err){IMP=null}
+  $('#imp-sum').innerHTML=IMP?impSummary():'This couldn\u2019t be read as a calendar.';
+  $('#dlg-save').disabled=!(IMP&&IMP.events.length);
+}
+async function impLoad(){
+  const u=($('#imp-url').value||'').trim(),sum=$('#imp-sum');
+  if(!/^https:\/\//.test(u)){sum.textContent='Paste a link starting with https://';return}
+  sum.textContent='Reading the calendar\u2026';
+  try{
+    const r=await fetch(u,{credentials:'omit',cache:'no-store'});
+    if(!r.ok)throw new Error(String(r.status));
+    const txt=await r.text();if(!/BEGIN:VCALENDAR/.test(txt))throw new Error('not a calendar');
+    impShow(txt);
+  }catch(e){
+    sum.innerHTML='This link can\u2019t be read from here (the calendar service doesn\u2019t allow it). <a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">Open the link</a>: your browser downloads the calendar file. Then choose that file above.';
+  }
+}
 form.addEventListener('change',e=>{
   if(e.target.id==='imp-cat'){const s=$('#imp-sum');if(s&&IMP)s.innerHTML=impSummary();return}
   if(e.target.id!=='imp-file'||!e.target.files.length)return;
-  const f=e.target.files[0];f.text().then(txt=>{
-    try{IMP=icsPlan(txt)}catch(err){IMP=null}
-    $('#imp-sum').innerHTML=IMP?impSummary():'This file couldn’t be read as a calendar.';
-    $('#dlg-save').disabled=!(IMP&&IMP.events.length);
-  });
+  e.target.files[0].text().then(impShow);
 });
 function impSummary(){
   const e=IMP.events,s=IMP.skipped,rep=e.filter(x=>x.repeat).length,cat=$('#imp-cat').value,list=EVCATS.find(c=>c[0]===cat)[1];
@@ -2442,6 +2457,7 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  impLoad:()=>impLoad(),
   openImport:()=>openImport(),
   attDel:b=>{const id=b.dataset.id,t=items.get(id);if(!t)return;const a=(t.attachments||[])[Number(b.dataset.i)];if(!a)return;
     if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Remove?';b.classList.add('armed');return}
