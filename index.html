@@ -218,6 +218,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .cal-row{display:grid}
 .gut{font-size:11px;color:var(--mute);text-align:right;padding-right:6px;position:sticky;left:0;background:var(--surface);z-index:3}
 .dh{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:7px 2px 5px;border-left:1px solid var(--line)}
+.dh:last-child,.daycol:last-child{border-right:1px solid var(--line)}
 .dn{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .dd{font-family:var(--f-display);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;padding:0 6px;border-radius:999px}
 .today .dd{background:var(--accent);color:var(--accent-ink)}
@@ -225,7 +226,8 @@ a.lk:hover{text-decoration-thickness:2px}
 .allday.drop{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .chip[data-task]{cursor:grab}
 .card,.blk,.chip{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.allday .gut{grid-column:1;grid-row:1;align-self:center}
+.allday .gut{grid-column:1;grid-row:1;align-self:center;padding-right:6px}
+.allday::after{content:"";grid-row:1/-1;grid-column:-2/-1;border-right:1px solid var(--line);pointer-events:none}
 .chip{border-radius:5px;padding:1px 6px;font-size:12px;font-weight:400;margin:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;min-width:0;border:1px solid transparent}
 .chip.ev{background:var(--ink);color:var(--surface)}
 .chip.se{background:var(--surface);border-color:color-mix(in srgb,var(--pc) 55%,var(--surface));color:var(--ink)}
@@ -278,7 +280,7 @@ a.lk:hover{text-decoration-thickness:2px}
 .chip.bar{margin:0 3px}
 .chip.cs{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0;border-left-style:dashed}
 .chip.ce{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0;border-right-style:dashed}
-.gutcol .glab{top:4px;transform:none;font-size:11px;color:var(--mute);letter-spacing:0}
+.gutcol .glab{top:4px;right:6px;transform:none;font-size:11px;color:var(--mute);letter-spacing:0}
 .mhead{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));position:sticky;top:0;background:var(--surface);z-index:6;border-bottom:1px solid var(--line)}
 .mhead div{text-align:center;padding:6px 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
 .mcell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0;cursor:pointer}
@@ -1210,7 +1212,7 @@ function renderCal(){
   const cal=$('#cal'),keepT=cal.scrollTop,keepL=cal.scrollLeft;
   if(st.span==='month'){renderMonth(cal);cal.scrollTop=keepT;return}
   const days=visDays(),today=tdy(),wide=days.length>1;
-  const cols='grid-template-columns:52px repeat('+days.length+',minmax('+(wide?'64px':'0')+',260px))';
+  const cols='grid-template-columns:64px repeat('+days.length+',minmax('+(wide?'64px':'0')+',260px))';
   const keys=days.map(ymd);
   const events=byKind('event'),sessions=byKind('session'),bands=byKind('band');
   const head='<div class="gut"></div>'+days.map((d,i)=>'<div class="dh'+(keys[i]===today?' today':'')+'"><span class="dn">'+DN[wd(d)]+'</span><span class="dd">'+d.getDate()+'</span></div>').join('');
@@ -1233,7 +1235,7 @@ function renderCal(){
     const now=new Date();
     return '<div class="daycol" data-date="'+k+'">'+bh+layout(list).map(b=>blockHtml(b,k)).join('')+(k===today?'<div class="now" style="top:'+((now.getHours()*60+now.getMinutes()-S0)/60*H)+'px"></div>':'')+'</div>';
   }).join('');
-  cal.innerHTML='<div class="cal-in" style="min-width:'+(wide?52+days.length*64:0)+'px"><div class="cal-top"><div class="cal-row" style="'+cols+'">'+head+'</div><div class="cal-row allday" style="'+cols+'"><div class="gut">calendar</div>'+ad+'</div></div>'+
+  cal.innerHTML='<div class="cal-in" style="min-width:'+(wide?64+days.length*64:0)+'px"><div class="cal-top"><div class="cal-row" style="'+cols+'">'+head+'</div><div class="cal-row allday" style="'+cols+'"><div class="gut">calendar</div>'+ad+'</div></div>'+
     '<div class="cal-row cal-body" style="'+cols+'"><div class="gutcol">'+gut+'</div>'+body+'</div></div>';
   cal.scrollTop=keepT;cal.scrollLeft=keepL;
 }
