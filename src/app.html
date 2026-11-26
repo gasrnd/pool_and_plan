@@ -94,7 +94,21 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 #split::after{content:"";position:absolute;top:50%;left:4px;width:4px;height:32px;margin-top:-16px;border-radius:3px;background:var(--line)}
 #split:hover::before,#split.drag::before,#split:focus-visible::before{background:color-mix(in srgb,var(--accent) 45%,var(--line))}
 #main:not(.plan) #split{display:none}
-#main.board{grid-template-columns:minmax(0,1fr)}
+#main.board{grid-template-columns:200px minmax(0,1fr);column-gap:28px}
+#index{display:none}
+#main.board #index{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;font-size:13px;padding:2px 2px 8px 0}
+#main.board #proj-sel{display:none}
+#main.plan #side{padding-left:8px}
+#index .ix{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:5px 8px;color:var(--ink);font:inherit;cursor:pointer}
+#index .ix:hover{background:color-mix(in srgb,var(--sunk) 70%,transparent)}
+#index .ix[aria-current=true]{background:var(--sunk);font-weight:600}
+#index .ix svg{width:16px;height:16px;flex:0 0 16px}
+#index .ix .n{margin-left:auto;font-size:11px;color:var(--mute);font-weight:400;font-variant-numeric:tabular-nums}
+#index .ix.bd svg{color:var(--pc)}
+#index .ix.vis{color:var(--mute)}
+#index .ixh{display:flex;align-items:center;justify-content:space-between;margin:12px 8px 3px;font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.04em;text-transform:uppercase}
+#index .ixh button{background:none;border:0;padding:0 4px;color:var(--mute);font-size:16px;line-height:1;cursor:pointer}
+#index .ixh button:hover{color:var(--ink)}
 #main.board #cal{display:none}
 #side{display:flex;flex-direction:column;gap:7px;min-height:0;min-width:0}
 .railrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -338,7 +352,10 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 @media (max-width:560px){
   #main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,2fr) minmax(0,3fr)}
   #split{display:none}
-  #main.board{grid-template-rows:minmax(0,1fr)}
+  #main.board{grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr)}
+  #main.board #index{display:none}
+  #main.board #proj-sel{display:block}
+  #main.plan #side{padding-left:0}
   .tools{margin-left:0}
   #main.zones #zones{grid-template-columns:minmax(0,1fr)}
 }
@@ -375,6 +392,7 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 <div id="alerts" hidden></div>
 <div id="strip">Loading your planner…</div>
 <main id="main" class="plan">
+  <nav id="index" aria-label="Boards"></nav>
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
@@ -481,7 +499,7 @@ const nid=()=>'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const dayLabel=k=>pdate(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
 function dateName(k){const t=tdy();return k===t?'Today':k===ymd(addDays(new Date(),1))?'Tomorrow':dayLabel(k)}
 function dateClass(k){const t=tdy();return k<t?'c-late':k===t?'c-today':k===ymd(addDays(new Date(),1))?'c-tom':'c-week'}
-const ICONS={cal:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/>',clock:'<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',flag:'<path d="M3 14.5V2M3 2.5h9l-2 3 2 3H3"/>',rep:'<path d="M2.5 7a5.5 5.5 0 0 1 10-2.5M13 1.5v3.2H9.8M13.5 9a5.5 5.5 0 0 1-10 2.5M3 14.5v-3.2h3.2"/>',bell:'<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1.5 1.5h-11zM6.5 14.5h3"/>',sub:'<path d="M4 2v6a3 3 0 0 0 3 3h5M10 8.5l2.5 2.5L10 13.5"/>',note:'<path d="M3 4h10M3 8h10M3 12h6"/>',tag:'<path d="M2 2.5h5.5l6.5 6.5-5 5L2.5 7.5z"/>'};
+const ICONS={inbox:'<path d="M2 9.5l1.8-6.2A1 1 0 0 1 4.8 2.5h6.4a1 1 0 0 1 1 .8L14 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"/>',today:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/><circle cx="8" cy="10.5" r="1.3" fill="currentColor" stroke="none"/>',upcoming:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3M5 10h2M9 10h2M5 12h2"/>',hash:'<path d="M6 2.5L4.5 13.5M11.5 2.5L10 13.5M3 6h10.5M2.5 10h10.5"/>',cal:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/>',clock:'<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',flag:'<path d="M3 14.5V2M3 2.5h9l-2 3 2 3H3"/>',rep:'<path d="M2.5 7a5.5 5.5 0 0 1 10-2.5M13 1.5v3.2H9.8M13.5 9a5.5 5.5 0 0 1-10 2.5M3 14.5v-3.2h3.2"/>',bell:'<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1.5 1.5h-11zM6.5 14.5h3"/>',sub:'<path d="M4 2v6a3 3 0 0 0 3 3h5M10 8.5l2.5 2.5L10 13.5"/>',note:'<path d="M3 4h10M3 8h10M3 12h6"/>',tag:'<path d="M2 2.5h5.5l6.5 6.5-5 5L2.5 7.5z"/>'};
 const ic=n=>'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[n]+'</svg>';
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)+3);const f=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7)}
 function durText(m){const h=Math.floor(m/60),r=m%60;return (h?h+' h':'')+(h&&r?' ':'')+(r?r+' min':'')||'0 min'}
@@ -992,7 +1010,7 @@ function visDays(){if(st.span==='week'){const m=monday(st.anchor);return [0,1,2,
 const sortKey=()=>st.proj===''?'inbox':String(st.proj).replace('@','v_');
 function boardSort(){const pf=items.get('prefs');return (pf&&pf.sort&&pf.sort[sortKey()])||'manual'}
 function render(){if(drag&&drag.moved){pendingRender=true;return}
-  try{TD.renderError='';st.sort=boardSort();renderTop();renderRail();renderBoard();renderCal();renderZones();renderAlerts()}
+  try{TD.renderError='';st.sort=boardSort();renderTop();renderRail();renderIndex();renderBoard();renderCal();renderZones();renderAlerts()}
   catch(e){TD.renderError=(e&&e.message)||String(e);console.error('Pool & Plan could not draw the page',e)}
   try{renderStrip()}catch(e){}
 }
@@ -1043,6 +1061,18 @@ function renderStrip(){
   if(readOnly)parts.push('Only the owner can see and change this planner.');
   if(loaded&&!items.size)parts.push('Nothing here yet. Press + in a list to add a task, then drag it onto a day.');
   s.hidden=!parts.length;s.innerHTML=parts.map(p=>'<span>'+p+'</span>').join('');
+}
+function renderIndex(){
+  const nav=$('#index');if(!nav||st.view!=='board')return;
+  const open=byKind('task').filter(e=>!isDone(e[1])&&!(e[1].parentId&&items.has(e[1].parentId)));
+  const count=pid=>open.filter(e=>pidOf(e[1])===pid).length;
+  const item=(v,icon,label,cls,n)=>'<button type="button" class="ix'+(cls?' '+cls:'')+'" data-act="pickProj" data-v="'+esc(v)+'"'+(st.proj===v?' aria-current="true"':'')+'>'+ic(icon)+'<span>'+esc(label)+'</span>'+(n?'<span class="n">'+n+'</span>':'')+'</button>';
+  const projs=byKind('project').sort(byOrder);
+  nav.innerHTML=item('@today','today','Today')+item('@days','upcoming','Upcoming')+
+    '<div class="ixh"><span>Boards</span><button type="button" data-act="newSection" aria-label="Add board" title="Add board">+</button></div>'+
+    projs.map(([id,p])=>item(id,'hash',p.name,'bd p'+(p.color||0),count(id))).join('')+
+    '<div class="ixh"><span>Views</span></div>'+item('@periodic','rep','Periodic','vis')+item('@labels','tag','By labels','vis')+
+    '<div class="ixh"></div>'+item('','inbox','Inbox','',count(''));
 }
 function renderRail(){
   const projs=byKind('project').sort(byOrder);
@@ -2131,6 +2161,7 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  pickProj:b=>{st.proj=b.dataset.v;saveUi();render()},
   openCompleted:()=>openCompleted(),
   doneMore:()=>doneLoadMore(),
   doneReopen:b=>{const ai=Number(b.dataset.ai),id=b.dataset.id;tdSend(ai,[{type:'item_uncomplete',uuid:tdUuid(),args:{id:id}}]);
