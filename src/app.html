@@ -779,8 +779,17 @@ async function tdFlushQueue(){
       TD.queue.shift();changed=true;
       if(!r.ok){toast('Todoist refused a change (error '+r.status+'). It was dropped; your Todoist is unchanged.');continue}
       const j=await r.json();
-      const bad=Object.values(j.sync_status||{}).filter(x=>x!=='ok');
-      if(bad.length)toast('Todoist didn’t accept a change: '+((bad[0]&&(bad[0].error||bad[0].error_tag))||'unknown reason')+'.');
+      const bad=Object.entries(j.sync_status||{}).filter(x=>x[1]!=='ok');
+      if(bad.length){
+        // say which task and which field Todoist objected to
+        const [uuid,err]=bad[0],cmd=job.cmds.find(c=>c.uuid===uuid)||{},a=cmd.args||{};
+        const what=a.content||(a.id&&items.get(a.id)&&items.get(a.id).title)||(a.item_id&&items.get(a.item_id)&&items.get(a.item_id).title)||a.name||'';
+        const field=err&&err.error_extra&&(err.error_extra.argument||err.error_extra.field);
+        const msg='Todoist didn\u2019t accept '+(bad.length>1?bad.length+' changes, e.g. ':'a change')+(what?' to \u201c'+plainText(what).slice(0,60)+'\u201d':'')+': '+((err&&(err.error||err.error_tag))||'unknown reason')+(field?' ('+field+')':'')+'.';
+        toast(msg);
+        TD.lastRefused={at:Date.now(),msg:msg,type:cmd.type,args:Object.assign({},a,{description:a.description?'('+a.description.length+' characters)':undefined}),error:err};
+        console.warn('Todoist refused',cmd.type,a,err);
+      }
       if(j.temp_id_mapping){Object.assign(TD.tempMap,j.temp_id_mapping);const ids=TD.settings&&TD.settings.ids;if(ids)Object.keys(ids).forEach(k=>{if(j.temp_id_mapping[ids[k]])ids[k]=j.temp_id_mapping[ids[k]]})}
       tdMerge(acc,j);acc.lastOk=Date.now();TD.lastOk=Date.now();TD.sendError='';
     }
@@ -1351,7 +1360,7 @@ function renderMonth(cal){
   cal.innerHTML='<div class="mhead">'+DN.map(n=>'<div>'+n+'</div>').join('')+'</div><div class="month">'+html+'</div>';
 }
 let toastT=0;
-function toast(msg){if(TD.on&&TD.warned&&Date.now()-TD.warned<400&&!/^Read-only/.test(msg))return;const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},3800)}
+function toast(msg){if(TD.on&&TD.warned&&Date.now()-TD.warned<400&&!/^Read-only/.test(msg))return;const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},/^Todoist didn/.test(msg)?12000:3800)}
 
 /* ---------- reminders ---------- */
 function beep(){try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.18);setTimeout(()=>c.close(),400)}catch(e){}}
