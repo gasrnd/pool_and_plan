@@ -116,6 +116,15 @@ header.top>.railopts #sort-sel,header.top>.railopts .chk{font-size:13px}
 #index .ix .n{margin-left:auto;font-size:11px;color:var(--mute);font-weight:400;font-variant-numeric:tabular-nums}
 #index .ix.bd svg{color:var(--pc)}
 #index .ix.vis{color:var(--mute)}
+#index .ixrow{position:relative;display:flex;align-items:center}
+#index .ixrow>.ix{flex:1 1 auto;min-width:0}
+#index .ixhide{position:absolute;right:26px;top:50%;transform:translateY(-50%);background:none;border:0;padding:3px;border-radius:5px;color:var(--mute);opacity:0;cursor:pointer;display:grid;place-items:center}
+#index .ixhide svg{width:14px;height:14px}
+#index .ixrow:hover .ixhide,#index .ixhide:focus-visible{opacity:1}
+#index .ixhide:hover{color:var(--ink);background:var(--surface)}
+#index .ixhid .ix{cursor:default}
+#index .ixshow{background:none;border:0;color:var(--mute);font-size:12px;cursor:pointer;padding:2px 8px}
+#index .ixshow:hover{color:var(--ink);text-decoration:underline}
 #index .ixh{display:flex;align-items:center;justify-content:space-between;margin:12px 8px 3px;font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.04em;text-transform:uppercase}
 #index .ixh button{background:none;border:0;padding:0 4px;color:var(--mute);font-size:16px;line-height:1;cursor:pointer}
 #index .ixh button:hover{color:var(--ink)}
@@ -514,7 +523,7 @@ const nid=()=>'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const dayLabel=k=>pdate(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
 function dateName(k){const t=tdy();return k===t?'Today':k===ymd(addDays(new Date(),1))?'Tomorrow':dayLabel(k)}
 function dateClass(k){const t=tdy();return k<t?'c-late':k===t?'c-today':k===ymd(addDays(new Date(),1))?'c-tom':'c-week'}
-const ICONS={inbox:'<path d="M2 9.5l1.8-6.2A1 1 0 0 1 4.8 2.5h6.4a1 1 0 0 1 1 .8L14 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"/>',today:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/><circle cx="8" cy="10.5" r="1.3" fill="currentColor" stroke="none"/>',upcoming:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3M5 10h2M9 10h2M5 12h2"/>',hash:'<path d="M6 2.5L4.5 13.5M11.5 2.5L10 13.5M3 6h10.5M2.5 10h10.5"/>',cal:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/>',clock:'<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',flag:'<path d="M3 14.5V2M3 2.5h9l-2 3 2 3H3"/>',rep:'<path d="M2.5 7a5.5 5.5 0 0 1 10-2.5M13 1.5v3.2H9.8M13.5 9a5.5 5.5 0 0 1-10 2.5M3 14.5v-3.2h3.2"/>',bell:'<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1.5 1.5h-11zM6.5 14.5h3"/>',sub:'<path d="M4 2v6a3 3 0 0 0 3 3h5M10 8.5l2.5 2.5L10 13.5"/>',note:'<path d="M3 4h10M3 8h10M3 12h6"/>',tag:'<path d="M2 2.5h5.5l6.5 6.5-5 5L2.5 7.5z"/>'};
+const ICONS={eyeoff:'<path d="M2 8s2.2-4.5 6-4.5S14 8 14 8s-2.2 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="1.8"/><path d="M2.5 13.5l11-11"/>',inbox:'<path d="M2 9.5l1.8-6.2A1 1 0 0 1 4.8 2.5h6.4a1 1 0 0 1 1 .8L14 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"/>',today:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/><circle cx="8" cy="10.5" r="1.3" fill="currentColor" stroke="none"/>',upcoming:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3M5 10h2M9 10h2M5 12h2"/>',hash:'<path d="M6 2.5L4.5 13.5M11.5 2.5L10 13.5M3 6h10.5M2.5 10h10.5"/>',cal:'<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/>',clock:'<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',flag:'<path d="M3 14.5V2M3 2.5h9l-2 3 2 3H3"/>',rep:'<path d="M2.5 7a5.5 5.5 0 0 1 10-2.5M13 1.5v3.2H9.8M13.5 9a5.5 5.5 0 0 1-10 2.5M3 14.5v-3.2h3.2"/>',bell:'<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1.5 1.5h-11zM6.5 14.5h3"/>',sub:'<path d="M4 2v6a3 3 0 0 0 3 3h5M10 8.5l2.5 2.5L10 13.5"/>',note:'<path d="M3 4h10M3 8h10M3 12h6"/>',tag:'<path d="M2 2.5h5.5l6.5 6.5-5 5L2.5 7.5z"/>'};
 const ic=n=>'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[n]+'</svg>';
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)+3);const f=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7)}
 function durText(m){const h=Math.floor(m/60),r=m%60;return (h?h+' h':'')+(h&&r?' ':'')+(r?r+' min':'')||'0 min'}
@@ -627,15 +636,19 @@ function tdBuildInner(){TD.buildError='';
       merged.get(b.name).lists.push({key:ai+'|'+l.key,title:title,tag:(many&&ai>0?accName(TD.accounts[ai]):'')+(l.restricted?(many&&ai>0?' \u00b7 ':'')+'restricted':''),board:b.name});
     });
   }));
-  TD.structs=structs;TD.layout=Object.assign({},v.Layout||{});
+  TD.structs=structs;
+  if(TD.layoutPending&&JSON.stringify(v.Layout||{})===JSON.stringify(TD.layoutPending))TD.layoutPending=null;
+  TD.layout=Object.assign({},v.Layout||{},TD.layoutPending||{});
+  const hiddenB=new Set(TD.layout.hidden||[]);TD.hiddenBoards=[...hiddenB];
   (TD.layout.boards||[]).forEach(n=>{if(!merged.has(n))merged.set(n,{name:n,lists:[],first:merged.size})});
+  hiddenB.forEach(n=>merged.delete(n));
   const lo=TD.layout.listOrder||{};
   merged.forEach(b=>{const w=lo[b.name];if(Array.isArray(w))b.lists.sort((x,y)=>{const i=w.indexOf(x.key),j=w.indexOf(y.key);return (i<0?1e9:i)-(j<0?1e9:j)})});
-  const want=(v.Layout&&Array.isArray(v.Layout.boardOrder))?v.Layout.boardOrder:[];
+  const want=Array.isArray(TD.layout.boardOrder)?TD.layout.boardOrder:[];
   const boards=[...merged.values()].sort((a,b)=>{
     const ia=want.indexOf(a.name),ib=want.indexOf(b.name);if(ia!==ib)return (ia<0?1e9:ia)-(ib<0?1e9:ib);
     if(a.name===P.UNSORTED||b.name===P.UNSORTED)return a.name===P.UNSORTED?1:-1;return a.first-b.first});
-  const colors=(v.Layout&&v.Layout.colors)||{};
+  const colors=TD.layout.colors||{};
   boards.forEach((b,i)=>m.set('b:'+b.name,{kind:'project',name:b.name,color:colors[b.name]||(i%6)+1,order:i+1,sections:b.lists.map(l=>({id:l.key,name:l.title,tag:l.tag||''}))}));
   TD.accounts.forEach((a,ai)=>{
     const S=structs[ai];
@@ -643,6 +656,7 @@ function tdBuildInner(){TD.buildError='';
       const x=P.fromTodoist(t,S);if(x.view==='config'||x.view==='hidden')return;
       if(x.view==='inbox'&&ai>0)return;            // only the main account's Inbox is shown
       const list=x.listKey?S.listsByKey.get(x.listKey):null;
+      if(list&&hiddenB.has(list.board))return;     // hidden board: its tasks stay out of every view
       const rs=remSplit(x.notes);
       const task={kind:'task',title:x.title,notes:rs.notes,priority:x.priority,labels:x.labels,parentId:x.parentId||'',order:x.order,done:x.done,
         projectId:list?'b:'+list.board:'',sectionId:list?ai+'|'+x.listKey:'',day:'',deadline:x.deadline,est:x.dur||60,restricted:x.restricted,acc:ai};
@@ -774,7 +788,7 @@ function tdSaveKind(k){
   else if(k==='zonegrid'){const g=items.get('zonegrid');tdSaveSetting('Zone grid',g?g.days:{})}
   else if(k==='rule')tdSaveSetting('Rules',byKind('rule').map(([id,r])=>{const o=Object.assign({id:id},r);delete o.kind;return o}));
 }
-function tdSaveLayout(){tdSaveSetting('Layout',TD.layout)}
+function tdSaveLayout(){TD.layoutPending=JSON.parse(JSON.stringify(TD.layout));tdSaveSetting('Layout',TD.layout)}
 // Boards and lists
 function tdPutBoard(id,p){
   const P=window.PPMap,old=items.get(id),name=String(p.name||'').trim().toUpperCase();
@@ -1085,9 +1099,10 @@ function renderIndex(){
   const projs=byKind('project').sort(byOrder);
   nav.innerHTML=item('@today','today','Today')+item('@days','upcoming','Upcoming')+
     '<div class="ixh"><span>Boards</span><button type="button" data-act="newSection" aria-label="Add board" title="Add board">+</button></div>'+
-    projs.map(([id,p])=>item(id,'hash',p.name,'bd p'+(p.color||0),count(id))).join('')+
+    projs.map(([id,p])=>'<div class="ixrow">'+item(id,'hash',p.name,'bd p'+(p.color||0),count(id))+(TD.on?'<button type="button" class="ixhide" data-act="hideBoard" data-v="'+esc(p.name)+'" aria-label="Hide '+esc(p.name)+'" title="Hide this board here (nothing changes in Todoist)">'+ic('eyeoff')+'</button>':'')+'</div>').join('')+
     '<div class="ixh"><span>Views</span></div>'+item('@periodic','rep','Periodic','vis')+item('@labels','tag','By labels','vis')+
-    '<div class="ixh"></div>'+item('','inbox','Inbox','',count(''));
+    '<div class="ixh"></div>'+item('','inbox','Inbox','',count(''))+
+    (TD.on&&(TD.hiddenBoards||[]).length?'<div class="ixh"><span>Hidden</span></div>'+TD.hiddenBoards.map(n=>'<div class="ixrow ixhid"><span class="ix vis">'+ic('eyeoff')+'<span>'+esc(n)+'</span></span><button type="button" class="ixshow" data-act="showBoard" data-v="'+esc(n)+'">Show</button></div>').join(''):'');
 }
 function placeRailOpts(){
   const ro=$('#railopts'),tabs=$('header.top>.tabs'),row=$('#side>.railrow');if(!ro||!tabs||!row)return;
@@ -2182,6 +2197,8 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  hideBoard:b=>{const n=b.dataset.v;TD.layout.hidden=[...new Set((TD.layout.hidden||[]).concat([n]))];tdSaveLayout();if(st.proj==='b:'+n){st.proj='@today';saveUi()}tdBuild();toast(n+' is hidden here. Its project in Todoist is untouched.')},
+  showBoard:b=>{const n=b.dataset.v;TD.layout.hidden=(TD.layout.hidden||[]).filter(x=>x!==n);tdSaveLayout();tdBuild()},
   pickProj:b=>{st.proj=b.dataset.v;saveUi();render()},
   openCompleted:()=>openCompleted(),
   doneMore:()=>doneLoadMore(),
