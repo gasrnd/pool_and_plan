@@ -649,7 +649,7 @@ async function tdSync(full){
   }finally{TD.busy=false}
 }
 function tdBuild(){
-  try{tdBuildInner();ntfySchedule();setTimeout(tdMigrateEventLabels,0)}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
+  try{tdBuildInner();ntfySchedule();setTimeout(()=>{tdMigrateEventLabels();tdFileSoon()},0)}catch(e){TD.buildError=(e&&e.message)||String(e);console.error('Pool & Plan could not lay out the Todoist data',e);loaded=true;try{render()}catch(x){}}
 }
 function tdBuildInner(){TD.buildError='';
   const P=window.PPMap,m=new Map(),merged=new Map();TD.taskAcc=new Map();
@@ -1328,7 +1328,7 @@ function renderCal(){
 }
 const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
 const EVKEYS=['ev','evs','evc','evh'];   // ev, evS, evC, evH: all events, each with its calendar colour
-const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0&&!c)c=i+1});return c};
+const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0)c=i+1});return c};   // with two event labels, the last (newest) counts
 const isEvent=t=>evCat(t)>0;
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
 function untimedEvents(keys){
@@ -2161,6 +2161,32 @@ async function ensureCalList(title){
   return sec;
 }
 
+/* ---------- events file themselves: a task labelled ev, evS, evC or evH moves into CALENDAR / Ev, EvS, EvC or EvH ---------- */
+let fileTry=0,fileTimer=0;
+function tdFileSoon(){clearTimeout(fileTimer);fileTry=0;fileTimer=setTimeout(tdFileEvents,300)}
+async function tdFileEvents(){
+  if(!TD.on||!loaded)return;
+  // wait until other changes have reached Todoist (and any filing still running), then file
+  if(TD.filing||TD.migrating||TD.queue.length||TD.dirty.size||TD.sending){if(++fileTry<40){clearTimeout(fileTimer);fileTimer=setTimeout(tdFileEvents,1000)}return}
+  const want=new Map(),b=items.get('b:CALENDAR');
+  byKind('task').forEach(([id,t])=>{
+    const c=evCat(t);if(!c||t.parentId||t.restricted||isDone(t)||tdAccOfTask(id,t)!==0)return;   // sub-tasks follow their parent; other accounts can't move here
+    const title=EVCATS[c-1][1],sec=b&&(b.sections||[]).find(x=>x.name===title&&accOfKey(x.id)===0);
+    if(sec&&t.sectionId===sec.id)return;
+    if(TD.fileTried&&TD.fileTried[id]&&Date.now()-TD.fileTried[id]<60000)return;
+    if(!want.has(title))want.set(title,[]);want.get(title).push(id);
+  });
+  if(!want.size)return;
+  TD.filing=true;let n=0;
+  try{
+    for(const [title,ids] of want){
+      const sec=await ensureCalList(title);if(!sec)continue;
+      ids.forEach(id=>{const t=items.get(id);if(!t||!evCat(t))return;(TD.fileTried=TD.fileTried||{})[id]=Date.now();items.set(id,Object.assign({},t,{projectId:'b:CALENDAR',sectionId:sec}));TD.dirty.set(id,true);n++});
+    }
+    if(n){touch();render();clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);toast(n+(n===1?' event':' events')+' moved into the CALENDAR board.')}
+  }finally{TD.filing=false}
+}
+
 /* ---------- one-time rename of earlier event labels and their CALENDAR lists to ev, evS, evC, evH ---------- */
 const OLDEV={event:'ev',events:'evS',eventc:'evC',eventh:'evH',eventh2:'evH',evsug:'evS',evcump:'evC',evhome:'evH'};
 const OLDLIST={Event:'Ev',EventS:'EvS',EventC:'EvC',EventH:'EvH',EventH2:'EvH',EvSug:'EvS',EvCump:'EvC',EvHome:'EvH'};
@@ -2186,7 +2212,7 @@ function tdMigrateEventLabels(){
     });
   }
   if(!n&&!cmds.length&&!moved)return;
-  TD.migrating=true;setTimeout(()=>{TD.migrating=false},5000);
+  TD.migrating=true;setTimeout(()=>{TD.migrating=false},1500);
   touch();render();
   if(cmds.length)tdSend(0,cmds);
   clearTimeout(TD.dirtyTimer);TD.dirtyTimer=setTimeout(tdFlushDirty,0);
@@ -2282,7 +2308,8 @@ dlg.addEventListener('close',()=>{curTask=null;reopen=null});
 /* labels picker in the task form: chips, a dropdown of existing labels, and "New label" last */
 let lblBusy=false;
 const lblCur=()=>{const h=$('#f-labels');return h?h.value.split(/\s+/).filter(Boolean):[]};
-function lblAdd(v){const h=$('#f-labels');if(!h||!v)return;const cur=lblCur();if(!cur.includes(v))cur.push(v);h.value=cur.join(' ')}
+function lblAdd(v){const h=$('#f-labels');if(!h||!v)return;const isEv=l=>EVKEYS.includes(String(l).toLowerCase());let cur=lblCur();if(isEv(v))cur=cur.filter(l=>!isEv(l));   // one event type at a time
+  if(!cur.includes(v))cur.push(v);h.value=cur.join(' ')}
 function labelBox(){
   const box=$('#lbl-box');if(!box)return;
   const cur=lblCur(),all=[...new Set(byKind('task').flatMap(e=>e[1].labels||[]))].filter(l=>!cur.includes(l)).sort();
@@ -2407,6 +2434,8 @@ function saveTask(id,fd){
   const old=id?items.get(id):null,date=fd.get('day')||'',time=fd.get('time')||'',dur=Number(fd.get('dur'))||(old&&old.est)||60,rv=fd.get('rep')||'',rtext=fd.get('repText')||'';
   const base={title:title,priority:Number(fd.get('priority'))||4,est:dur,notes:String(fd.get('notes')||''),
     labels:[...new Set(String(fd.get('labels')||'').split(/[,\s]+/).map(x=>x.replace(/^@/,'')).filter(Boolean))]};
+  {const isEv=l=>EVKEYS.includes(String(l).toLowerCase()),evs=base.labels.filter(isEv);
+   if(evs.length>1){const fresh=evs.filter(l=>!((old&&old.labels)||[]).includes(l)),keep=(fresh.length?fresh:evs)[(fresh.length?fresh:evs).length-1];base.labels=base.labels.filter(l=>!isEv(l)||l===keep)}}
   if(fd.has('projectId')){base.projectId=fd.get('projectId')||'';base.sectionId=fd.get('sectionId')||''}
   const timed=!!(date&&time),prim=id?primarySes(id):null;
   let rems=[];try{rems=JSON.parse(fd.get('reminders')||'[]')||[]}catch(e){}

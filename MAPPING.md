@@ -111,6 +111,6 @@ These tasks are hidden in Pool & Plan. Editing them by hand in Todoist works but
 - Events lasting more than one day appear only on the calendar, never in lists.
 - Todoist keeps at most 24 hours of length, so a multi-day duration is kept as a last line in the description: `↔ 3 days`.
 - In the calendar each type has its colour: ev purple, evS mustard-khaki, evC red (as P1), evH brown. A priority (P1–P3) replaces it. Lists are not coloured.
-- Clicking an empty spot in the month view adds an event on that day; you pick its type. It goes to `CALENDAR <Type>` (Ev, EvS, EvC, EvH).
+- Clicking an empty spot in the month view or the calendar row adds an event on that day; you must pick its type. Every task with an event label is moved into `CALENDAR <Type>` (Ev, EvS, EvC, EvH) automatically, and a task has one event type: choosing another replaces it, and its colour and list follow.
 - **Import calendar** (Pool & Plan menu) copies an `.ics` file or calendar link once, for example a calendar from Proton, into the same lists. Only events from today onwards; repeats stay repeating when Todoist can say the same thing, otherwise they become separate dates for the next 12 months. Importing again skips what is already there and corrects durations and times.
 - Earlier labels (event, eventS, eventC, eventH, eventH2, evSug, evCump, evHome) and their CALENDAR lists are renamed once, automatically.
