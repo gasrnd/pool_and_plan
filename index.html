@@ -926,7 +926,7 @@ function openAccounts(){
     const projs=[...a.raw.projects.values()].filter(p=>!p.is_deleted&&!p.is_archived&&P0kind(p)==='board');
     if(!projs.length)return '';
     return '<h3>Projects of '+esc(accName(a))+'</h3><div class="hint">Show each project as its own board, or as one list on a board you choose.</div>'+
-      projs.map(p=>{const k=a.email+'|'+p.id;return '<label class="li pbrow"><span>'+esc(p.name)+'</span><select data-pb="'+esc(k)+'" aria-label="Where to show '+esc(p.name)+'"><option value="">Its own board</option>'+
+      projs.map(p=>{const k=a.email+'|'+p.id;return '<label class="li pbrow"><span>'+esc(p.name)+'</span><select data-pb="'+esc(k)+'" aria-label="Where to show '+esc(p.name)+'"><option value="">Its own board</option><option value="-"'+(pb[k]==='-'?' selected':'')+'>Don\u2019t show</option>'+
         boardNames.map(n=>'<option value="'+esc(n)+'"'+(pb[k]===n?' selected':'')+'>List on '+esc(n)+'</option>').join('')+'</select></label>'}).join('');
   }).join('');
   const body='<div class="hint">The main account\u2019s Inbox and NOTES Config settings are used; the others contribute their lists. Boards with the same name are shown together; each list stays in its own account.</div>'+
@@ -1900,7 +1900,7 @@ form.addEventListener('change',e=>{
   TD.layout.projectBoards=pb;
   if(v)TD.layout.hidden=(TD.layout.hidden||[]).filter(x=>x!==name.trim());   // it is a list now, no longer a hidden board
   tdSaveLayout();tdBuild();
-  toast(v?name+' now shows as a list on '+v+'.':name+' shows as its own board again.');
+  toast(v==='-'?name+' is no longer shown here. Nothing changes in Todoist.':v?name+' now shows as a list on '+v+'.':name+' shows as its own board again.');
 });
 form.addEventListener('change',e=>{if(e.target.id==='done-board'){DONE.board=e.target.value;doneRender()}});
 

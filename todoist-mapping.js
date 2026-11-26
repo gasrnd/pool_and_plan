@@ -71,7 +71,8 @@
     live.forEach(p => {
       let c = classifyProject(p);
       const to = placed[p.id];
-      if (to && c.kind === 'board') c = { kind: 'linked', board: String(to).trim().toUpperCase(), list: String(p.name || '').trim(), placed: true };
+      if (to === '-' && c.kind === 'board') c = { kind: 'hidden' };
+      else if (to && c.kind === 'board') c = { kind: 'linked', board: String(to).trim().toUpperCase(), list: String(p.name || '').trim(), placed: true };
       projectRole.set(p.id, c);
       if (c.kind === 'inbox') inboxProjectId = p.id;
       if (c.kind === 'container') containerIds.push(p.id);
@@ -121,6 +122,7 @@
     const role = s.projectRole.get(t.project_id);
     if (!role) return { view: 'hidden' };
     if (t.section_id && t.section_id === s.configSectionId) return { view: 'config' };
+    if (role.kind === 'hidden') return { view: 'hidden' };
     if (role.kind === 'inbox') return { view: 'inbox' };
     if (role.kind === 'container') return t.section_id && s.sectionToList.has(t.section_id) ? { listKey: s.sectionToList.get(t.section_id) } : { view: 'inbox' };
     if (role.kind === 'linked') return { listKey: 'p:' + t.project_id };
