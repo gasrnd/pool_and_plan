@@ -1357,6 +1357,8 @@ const sesTasks=()=>new Set(byKind('session').map(e=>e[1].taskId));
 const EVKEYS=['ev','evs','evc','evh'];   // ev, evS, evC, evH: all events, each with its calendar colour
 const evCat=t=>{if(!t)return 0;let c=0;(t.labels||[]).forEach(l=>{const i=EVKEYS.indexOf(String(l).toLowerCase());if(i>=0)c=i+1});return c};   // with two event labels, the last (newest) counts
 const isEvent=t=>evCat(t)>0;
+const EVORDER={4:0,1:1,2:2,3:3};   // evH, ev, evS, evC
+const evRank=t=>{const c=evCat(t);return c?EVORDER[c]:9};
 // Events without a time, for the "calendar" row: one chip per day they cover (or per repeat)
 function untimedEvents(keys){
   const out=[];
@@ -1366,7 +1368,7 @@ function untimedEvents(keys){
     const L=lastDay(t);if(t.day>keys[keys.length-1]||L<keys[0])return;
     out.push({id:id,t:t,a:Math.max(0,diffDays(keys[0],t.day)),b:Math.min(keys.length-1,diffDays(keys[0],L)),cs:t.day<keys[0],ce:L>keys[keys.length-1]});
   });
-  return out;
+  return out.sort((x,y)=>evRank(x.t)-evRank(y.t)||x.a-y.a||(y.b-y.a)-(x.b-x.a));
 }
 const chipCls=t=>{const p=projOf(t),c=evCat(t);return 'chip se p'+((p&&p.color)||0)+' pr'+(t.priority||4)+(c?' evc'+c:'')};
 function renderMonth(cal){
@@ -1386,7 +1388,7 @@ function renderMonth(cal){
     });
     oldEv.forEach(([id,e])=>{if(!e.allDay||e.repeat||!e.end||e.end===e.date||e.date>keys[6]||e.end<keys[0])return;
       bars.push({old:id,t:e,ev:true,a:Math.max(0,diffDays(keys[0],e.date)),b:Math.min(6,diffDays(keys[0],e.end)),cs:e.date<keys[0],ce:e.end>keys[6]})});
-    bars.sort((x,y)=>(y.ev-x.ev)||x.a-y.a||(y.b-y.a)-(x.b-x.a));
+    bars.sort((x,y)=>(x.old?5:evRank(x.t))-(y.old?5:evRank(y.t))||x.a-y.a||(y.b-y.a)-(x.b-x.a));
     const lanes=[];bars.forEach(b=>{let r=lanes.findIndex(end=>end<b.a);if(r<0){r=lanes.length;lanes.push(-1)}lanes[r]=b.b;b.r=r});
     const nb=lanes.length;
     html+='<div class="mweek" style="grid-template-rows:auto'+(nb?' repeat('+nb+',auto)':'')+' 1fr">'+
@@ -1396,16 +1398,16 @@ function renderMonth(cal){
     // 2. per day: events (untimed first, then by time), then tasks by priority
     keys.forEach((k,i)=>{
       const evs=[],tks=[];
-      oldEv.forEach(([id,e])=>{if((e.allDay&&e.end&&e.end!==e.date&&!e.repeat)||!occursOn(e,k))return;evs.push({s:e.allDay?-1:e.start,h:'<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+(e.allDay?'':hm(e.start)+' ')+fmt(e.title)+'</div>'})});
+      oldEv.forEach(([id,e])=>{if((e.allDay&&e.end&&e.end!==e.date&&!e.repeat)||!occursOn(e,k))return;evs.push({r:5,s:e.allDay?-1:e.start,h:'<div class="chip ev" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button">'+(e.allDay?'':hm(e.start)+' ')+fmt(e.title)+'</div>'})});
       sessions.forEach(([id,s])=>{if(!occursOn(s,k))return;const t=items.get(s.taskId),n=sesInfo(s,k);if(!t||(t.parentId&&items.has(t.parentId)))return;
-        const c={s:s.start,p:t.priority||4,h:'<div class="'+chipCls(t)+(n.done?' is-done':'')+'" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button"><b class="mt">'+hm(s.start)+'</b> '+fmt(n.title)+'</div>'};
+        const c={r:evRank(t),s:s.start,p:t.priority||4,h:'<div class="'+chipCls(t)+(n.done?' is-done':'')+'" data-id="'+id+'" data-date="'+k+'" tabindex="0" role="button"><b class="mt">'+hm(s.start)+'</b> '+fmt(n.title)+'</div>'};
         (isEvent(t)?evs:tks).push(c)});
       tasks.forEach(([id,t])=>{
         if(!t.day||(t.days||1)>1||hasSes.has(id))return;
         if(!(t.recur?occursOn({date:t.day,repeat:t.recur},k):t.day===k))return;
-        (isEvent(t)?evs:tks).push({s:-1,p:t.priority||4,h:'<div class="'+chipCls(t)+(isDone(t)?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'});
+        (isEvent(t)?evs:tks).push({r:evRank(t),s:-1,p:t.priority||4,h:'<div class="'+chipCls(t)+(isDone(t)?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'});
       });
-      evs.sort((x,y)=>x.s-y.s);tks.sort((x,y)=>x.p-y.p||x.s-y.s);
+      evs.sort((x,y)=>x.r-y.r||x.s-y.s);tks.sort((x,y)=>x.p-y.p||x.s-y.s);
       const all=evs.concat(tks),room=Math.max(1,5-nb);
       html+='<div class="mlist mc" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:'+(nb+2)+'">'+all.slice(0,room).map(c=>c.h).join('')+(all.length>room?'<span class="more">+'+(all.length-room)+' more</span>':'')+'</div>';
     });
