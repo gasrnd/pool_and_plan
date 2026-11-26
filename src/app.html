@@ -98,7 +98,11 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 #index{display:none}
 #main.board #index{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;font-size:13px;padding:2px 2px 8px 0}
 #main.board #proj-sel{display:none}
-#main.board #side>.railrow{min-height:28px;margin-top:2px}
+body[data-view="board"] #side>.railrow{display:none}
+body[data-view="board"] #main{margin-top:12px}
+.railopts{display:flex;gap:6px;align-items:center;min-width:0}
+header.top>.railopts{margin-left:12px}
+header.top>.railopts #sort-sel,header.top>.railopts .chk{font-size:13px}
 #main.plan #side{padding-left:8px}
 #index .ix{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:5px 8px;color:var(--ink);font:inherit;cursor:pointer}
 #index .ix:hover{background:color-mix(in srgb,var(--sunk) 70%,transparent)}
@@ -114,7 +118,7 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 #side{display:flex;flex-direction:column;gap:7px;min-height:0;min-width:0}
 .railrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .railrow select.sm{flex:1 1 0;width:auto;min-width:0;padding:3px 4px;font-size:12px}
-.railrow #sort-sel{flex:0 1 auto;max-width:13em;min-width:6em}
+.railopts #sort-sel{flex:0 1 auto;max-width:13em;min-width:6em}
 #proj-sel.bd,#proj-sel option.bd{color:var(--pc)}
 #proj-sel.vis,#proj-sel option.vis{color:var(--mute)}
 #proj-sel option{font-weight:600}
@@ -128,7 +132,7 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 .menu .pop{position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px;display:flex;flex-direction:column;gap:2px;min-width:170px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .menu .pop button{border:0;text-align:left;font-size:13px}
 .menu .pop button:hover{background:var(--sunk)}
-.brandmenu summary.brand{color:var(--ink);border:0;background:transparent;padding:2px 4px;margin-left:-4px;font-size:16px;line-height:1.3;border-radius:6px;display:flex;align-items:center;gap:4px}
+.brandmenu summary.brand{color:var(--ink);border:0;background:transparent;padding:2px 4px;margin-left:-4px;font-size:19px;line-height:1.3;border-radius:6px;display:flex;align-items:center;gap:4px}
 .brandmenu summary.brand:hover{background:var(--sunk)}
 .brandmenu summary.brand i{font-style:normal;font-size:11px;color:var(--mute)}
 .brandmenu .pop{position:fixed;min-width:180px}
@@ -160,8 +164,8 @@ ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:3px;c
 .resched-pop{display:flex;flex-wrap:wrap;gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .resched-pop input{flex:1 1 9em;padding:2px 6px}
 .railrow #proj-sel{flex:0 1 9.5em;min-width:5em;font-size:15px;font-weight:700;color:var(--ink)}
-.railrow #sort-sel,.railrow .chk.sm,.menu summary{color:var(--dark)}
-.railrow #sort-sel,.menu summary{border-color:transparent;background:transparent}
+.railopts #sort-sel,.railopts .chk.sm,.menu summary{color:var(--dark)}
+.railopts #sort-sel,.menu summary{border-color:transparent;background:transparent}
 .railrow .chk.sm input{opacity:.6}
 .lane-note{color:var(--mute);font-size:12px;padding:0 2px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;cursor:grab;user-select:none;min-width:0}
@@ -400,9 +404,9 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
-      <select id="sort-sel" class="sm" aria-label="Sorting"></select>
+      <div class="railopts" id="railopts"><select id="sort-sel" class="sm" aria-label="Sorting"></select>
       <label class="chk sm"><input type="checkbox" id="flt-unsched"> No date</label>
-      <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label>
+      <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label></div>
     </div>
     <div id="board"></div>
   </section>
@@ -1077,7 +1081,13 @@ function renderIndex(){
     '<div class="ixh"><span>Views</span></div>'+item('@periodic','rep','Periodic','vis')+item('@labels','tag','By labels','vis')+
     '<div class="ixh"></div>'+item('','inbox','Inbox','',count(''));
 }
+function placeRailOpts(){
+  const ro=$('#railopts'),tabs=$('header.top>.tabs'),row=$('#side>.railrow');if(!ro||!tabs||!row)return;
+  if(st.view==='board'){if(ro.previousElementSibling!==tabs)tabs.after(ro)}
+  else if(ro.parentNode!==row)row.appendChild(ro);
+}
 function renderRail(){
+  placeRailOpts();
   const projs=byKind('project').sort(byOrder);
   if(st.proj==='*'||(!special()&&st.proj!==''&&!items.has(st.proj)&&loaded))st.proj='@today';
   const ps=$('#proj-sel');
