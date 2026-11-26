@@ -691,6 +691,15 @@ function tdBuildInner(){TD.buildError='';
       (t.attachments=t.attachments||[]).push({noteId:n.id,name:f.file_name||'File',url:f.file_url,size:f.file_size||0,image:f.image||((/^image\//.test(f.file_type||'')||f.resource_type==='image')?f.file_url:'')});
     });
   });
+  (TD.doneEv||new Map()).forEach((d,id)=>{
+    if(m.has(id))return;const S=structs[d.ai];if(!S)return;
+    const x=P.fromTodoist(Object.assign({},d.raw,{checked:true}),S),rs=remSplit(x.notes),list=x.listKey?S.listsByKey.get(x.listKey):null;
+    const task={kind:'task',title:x.title,notes:rs.notes,priority:x.priority,labels:x.labels,parentId:'',order:x.order,done:true,doneEvent:true,
+      projectId:list?'b:'+list.board:'',sectionId:list?d.ai+'|'+x.listKey:'',day:'',deadline:'',est:x.dur||60,restricted:true,acc:d.ai};
+    if(x.time==null){task.day=x.day;const dd=rs.days||x.days;if(dd>1)task.days=dd}
+    else if(x.day)m.set('s:'+id,{kind:'session',taskId:id,date:x.day,start:x.time,dur:x.dur||60,done:true,remind:-1});
+    if(task.day||m.has('s:'+id)){m.set(id,task);TD.taskAcc.set(id,d.ai)}
+  });
   m.forEach((x,k)=>{if(x.kind!=='session')return;const t=m.get(x.taskId),rel=((t&&t.reminders)||[]).filter(r=>r.min!=null).map(r=>r.min);x.remind=rel.length?Math.min(...rel):-1});
   (Array.isArray(v.Zones)?v.Zones:[]).forEach((z,i)=>m.set(z.id||('z'+i),Object.assign({kind:'zone',order:i},z)));
   if(v['Zone grid'])m.set('zonegrid',{kind:'zonegrid',days:v['Zone grid']});
@@ -896,11 +905,35 @@ function tdDel(id){
   toast('That can’t be removed from Todoist here.');render();
 }
 // Completing: Todoist itself moves a repeating task to its next date.
+TD.doneEv=new Map();TD.doneRanges=new Set();let doneEvTimer=0;
+function doneEvWanted(from,to){   // called when the calendar shows from..to (YYYY-MM-DD)
+  if(!TD.on||!loaded)return;const key=from+'|'+to;if(TD.doneRanges.has(key))return;
+  clearTimeout(doneEvTimer);doneEvTimer=setTimeout(()=>doneEvFetch(from,to,key),400);
+}
+async function doneEvFetch(from,to,key){
+  if(TD.doneRanges.has(key))return;TD.doneRanges.add(key);
+  const since=from+'T00:00:00Z',until=ymd(addDays(pdate(to),1))+'T00:00:00Z';let added=0;
+  for(let ai=0;ai<TD.accounts.length;ai++){
+    const acc=TD.accounts[ai],S=TD.structs[ai];if(!acc||!S)continue;
+    try{
+      let cursor='',pages=0;
+      do{
+        const u=new URL('https://api.todoist.com/api/v1/tasks/completed/by_due_date');
+        u.searchParams.set('since',since);u.searchParams.set('until',until);u.searchParams.set('limit','200');if(cursor)u.searchParams.set('cursor',cursor);
+        const r=await fetch(u,{headers:{Authorization:'Bearer '+acc.token}});if(!r.ok)break;
+        const j=await r.json();
+        (j.items||[]).forEach(it=>{if(!evCat({labels:it.labels}))return;if(!TD.doneEv.has(it.id))added++;TD.doneEv.set(it.id,{raw:it,ai:ai})});
+        cursor=j.next_cursor||'';
+      }while(cursor&&++pages<10);
+    }catch(e){TD.doneRanges.delete(key)}
+  }
+  if(added)tdBuild();
+}
 function tdComplete(id){
   const t=items.get(id),ai=tdAccOfTask(id,t),acc=TD.accounts[ai],r=acc&&acc.raw.items.get(id);
   if(!r){items.set(id,Object.assign({},t,{done:true}));touch();render();tdMarkDirty(id);return}
   const recurring=!!(r.due&&r.due.is_recurring);
-  if(!recurring){items.set(id,Object.assign({},t,{done:true}));touch();render()}
+  if(!recurring){items.set(id,Object.assign({},t,{done:true}));touch();render();if(isEvent(t))TD.doneEv.set(id,{raw:Object.assign({},r,{checked:true}),ai:ai})}
   tdSend(ai,[{type:'item_close',uuid:tdUuid(),args:{id:id}}]);
   toast(recurring?'Done. Todoist moves it to its next date.':'Done.');
 }
@@ -1210,7 +1243,7 @@ function cardHtml(id,t,all){
     (subs.length&&subOpen?'<div class="subs">'+subs.map(([sid,s])=>'<div class="sub'+(isDone(s)?' is-done':'')+'" data-task="'+sid+'"><button class="tk pr'+(s.priority||4)+'" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete subtask">'+(isDone(s)?'✓':'')+'</button><span>'+fmt(s.title,true)+'</span></div>').join('')+'</div>':'')+'</div>';
 }
 function inLane(l,id,t){
-  if((t.days||1)>1&&isEvent(t))return false;    // multi-day events live on the calendar only
+  if(isEvent(t)&&t.day&&!items.has('s:'+id)&&!sessionsOf(id).length)return false;   // all-day events (no time) live on the calendar only
   if(l.type==='proj')return pidOf(t)===l.id&&(st.proj!=='@periodic'||!!t.recur||sessionsOf(id).some(e=>e[1].repeat));
   if(l.type==='sec')return pidOf(t)===st.proj&&secOf(t)===l.id;
   if(l.type==='label')return l.id?(t.labels||[]).includes(l.id):!(t.labels||[]).length;
@@ -1227,6 +1260,7 @@ function laneTasks(lane,all){
   let list=all.filter(([id,t])=>{
     if(t.parentId&&items.has(t.parentId))return false;
     if(!inLane(lane,id,t))return false;
+    if(t.doneEvent)return false;                  // completed events stay on the calendar only
     if(!st.showDone&&isDone(t))return false;
     if(st.unsched&&(t.day||upcoming(id).length))return false;
     return true;
@@ -1293,6 +1327,7 @@ function renderCal(){
   const days=visDays(),today=tdy(),wide=days.length>1;
   const cols='grid-template-columns:64px repeat('+days.length+',minmax('+(wide?'64px':'0')+',260px))';
   const keys=days.map(ymd);
+  doneEvWanted(keys[0],keys[keys.length-1]);
   const events=byKind('event'),sessions=byKind('session'),bands=byKind('band');
   const head='<div class="gut"></div>'+days.map((d,i)=>'<div class="dh'+(keys[i]===today?' today':'')+'"><span class="dn">'+DN[wd(d)]+'</span><span class="dd">'+d.getDate()+'</span></div>').join('');
   let ad='';
@@ -1303,7 +1338,7 @@ function renderCal(){
     const a=Math.max(0,diffDays(keys[0],e.date)),b=Math.min(days.length-1,diffDays(keys[0],e.end||e.date));
     ad+='<div class="chip ev" data-id="'+id+'" data-date="'+e.date+'" tabindex="0" role="button" style="grid-column:'+(a+2)+'/'+(b+3)+'">'+fmt(e.title)+'</div>';
   });
-  untimedEvents(keys).forEach(b=>{ad+='<div class="'+chipCls(b.t)+(b.cs?' cs':'')+(b.ce?' ce':'')+'" data-task="'+b.id+'" tabindex="0" role="button" style="grid-column:'+(b.a+2)+'/'+(b.b+3)+'">'+fmt(b.t.title)+'</div>'});
+  untimedEvents(keys).forEach(b=>{ad+='<div class="'+chipCls(b.t)+(isDone(b.t)?' is-done':'')+(b.cs?' cs':'')+(b.ce?' ce':'')+'" data-task="'+b.id+'" tabindex="0" role="button" style="grid-column:'+(b.a+2)+'/'+(b.b+3)+'">'+fmt(b.t.title)+'</div>'});
   let gut='<span class="glab">agenda</span>';for(let h=7;h<23;h++)gut+='<span style="top:'+((h-6)*H)+'px">'+pad(h)+':00</span>';
   const body=days.map((d,di)=>{
     const k=keys[di],w=wd(d);
@@ -1326,7 +1361,7 @@ const isEvent=t=>evCat(t)>0;
 function untimedEvents(keys){
   const out=[];
   byKind('task').forEach(([id,t])=>{
-    if(!isEvent(t)||!t.day||isDone(t)||(t.parentId&&items.has(t.parentId))||sesTasks().has(id))return;
+    if(!isEvent(t)||!t.day||(t.parentId&&items.has(t.parentId))||sesTasks().has(id))return;
     if(t.recur&&(t.days||1)<2){keys.forEach((k,i)=>{if(occursOn({date:t.day,repeat:t.recur},k))out.push({id:id,t:t,a:i,b:i})});return}
     const L=lastDay(t);if(t.day>keys[keys.length-1]||L<keys[0])return;
     out.push({id:id,t:t,a:Math.max(0,diffDays(keys[0],t.day)),b:Math.min(keys.length-1,diffDays(keys[0],L)),cs:t.day<keys[0],ce:L>keys[keys.length-1]});
@@ -1337,8 +1372,9 @@ const chipCls=t=>{const p=projOf(t),c=evCat(t);return 'chip se p'+((p&&p.color)|
 function renderMonth(cal){
   const a=new Date(st.anchor),first=new Date(a.getFullYear(),a.getMonth(),1),start=monday(first),today=tdy();
   const last=new Date(a.getFullYear(),a.getMonth()+1,0),weeks=Math.ceil((diffDays(ymd(start),ymd(last))+1)/7);
+  doneEvWanted(ymd(start),ymd(addDays(start,weeks*7-1)));
   const oldEv=byKind('event'),sessions=byKind('session'),hasSes=new Set(sessions.map(e=>e[1].taskId));
-  const tasks=byKind('task').filter(([id,t])=>!isDone(t)&&!(t.parentId&&items.has(t.parentId)));
+  const tasks=byKind('task').filter(([id,t])=>(!isDone(t)||isEvent(t))&&!(t.parentId&&items.has(t.parentId)));
   let html='';
   for(let w=0;w<weeks;w++){
     const ws=addDays(start,w*7),keys=[...Array(7)].map((_,i)=>ymd(addDays(ws,i)));
@@ -1356,7 +1392,7 @@ function renderMonth(cal){
     html+='<div class="mweek" style="grid-template-rows:auto'+(nb?' repeat('+nb+',auto)':'')+' 1fr">'+
       keys.map((k,i)=>'<div class="mcell'+(pdate(k).getMonth()!==a.getMonth()?' out':'')+(k===today?' today':'')+'" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:1/-1"></div>').join('')+
       keys.map((k,i)=>'<span class="dd mc'+(k===today?' tn':'')+'" data-date="'+k+'" style="grid-column:'+(i+1)+';grid-row:1">'+pdate(k).getDate()+'</span>').join('')+
-      bars.map(b=>'<div class="'+(b.old?'chip ev':chipCls(b.t))+' bar'+(b.cs?' cs':'')+(b.ce?' ce':'')+'" '+(b.old?'data-id="'+b.old+'" data-date="'+b.t.date+'"':'data-task="'+b.id+'"')+' tabindex="0" role="button" style="grid-column:'+(b.a+1)+'/'+(b.b+2)+';grid-row:'+(b.r+2)+'">'+fmt(b.t.title)+'</div>').join('');
+      bars.map(b=>'<div class="'+(b.old?'chip ev':chipCls(b.t)+(isDone(b.t)?' is-done':''))+' bar'+(b.cs?' cs':'')+(b.ce?' ce':'')+'" '+(b.old?'data-id="'+b.old+'" data-date="'+b.t.date+'"':'data-task="'+b.id+'"')+' tabindex="0" role="button" style="grid-column:'+(b.a+1)+'/'+(b.b+2)+';grid-row:'+(b.r+2)+'">'+fmt(b.t.title)+'</div>').join('');
     // 2. per day: events (untimed first, then by time), then tasks by priority
     keys.forEach((k,i)=>{
       const evs=[],tks=[];
@@ -1367,7 +1403,7 @@ function renderMonth(cal){
       tasks.forEach(([id,t])=>{
         if(!t.day||(t.days||1)>1||hasSes.has(id))return;
         if(!(t.recur?occursOn({date:t.day,repeat:t.recur},k):t.day===k))return;
-        (isEvent(t)?evs:tks).push({s:-1,p:t.priority||4,h:'<div class="'+chipCls(t)+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'});
+        (isEvent(t)?evs:tks).push({s:-1,p:t.priority||4,h:'<div class="'+chipCls(t)+(isDone(t)?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button">'+fmt(t.title)+'</div>'});
       });
       evs.sort((x,y)=>x.s-y.s);tks.sort((x,y)=>x.p-y.p||x.s-y.s);
       const all=evs.concat(tks),room=Math.max(1,5-nb);
