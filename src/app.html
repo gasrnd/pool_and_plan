@@ -399,7 +399,6 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
   <section id="side">
     <div class="railrow">
       <select id="proj-sel" class="sm" aria-label="Section"></select>
-      <details class="menu" id="sec-menu"><summary aria-label="Section options" id="sec-menu-btn">⋯</summary><div class="pop"><button type="button" data-act="newSection" id="m-add-section">Add section</button><button type="button" data-act="editList" data-id="" id="m-edit-section">Edit this section</button><button type="button" data-act="tdSyncNow" id="m-sync" hidden>Sync with Todoist now</button></div></details>
       <select id="sort-sel" class="sm" aria-label="Sorting"></select>
       <label class="chk sm"><input type="checkbox" id="flt-unsched"> No date</label>
       <label class="chk sm"><input type="checkbox" id="flt-done"> Done</label>
@@ -846,7 +845,7 @@ function tdComplete(id){
 }
 
 function tdRun(){
-  TD.on=true;$('#m-sync').hidden=false;
+  TD.on=true;
   clearInterval(TD.timer);
   TD.timer=setInterval(()=>{if(TD.queue.length){tdFlushQueue();return}if(!document.hidden&&!TD.dirty.size)tdSync(false).catch(()=>{})},60000);
 }
@@ -2220,7 +2219,7 @@ const ACT={
   tdRemove:(b,id)=>{
     if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Click again to remove';return}
     TD.accounts.splice(+id,1);tdSave();
-    if(!TD.accounts.length){tdStop();dlg.close();items=new Map();touch();render();$('#m-sync').hidden=true;showConnect('All accounts removed. Paste a token to connect again.');return}
+    if(!TD.accounts.length){tdStop();dlg.close();items=new Map();touch();render();showConnect('All accounts removed. Paste a token to connect again.');return}
     tdBuild();openAccounts();
   },
   editSection:(b,id)=>openSection(id),
