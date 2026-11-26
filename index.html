@@ -1234,7 +1234,7 @@ function blockHtml(b,k){
   if(it.kind==='event')return '<div class="blk ev" '+attrs+'><div class="blk-t">'+fmt(it.title)+'</div>'+hours+'<div class="rs"></div></div>';
   const i=sesInfo(it,k),t=items.get(it.taskId)||{};
   // labels, attachments, repeat and reminders, when the block is tall enough (about 70 minutes or more)
-  const labs=(t.labels||[]).filter(l=>String(l).toLowerCase()!=='event'),att=(t.attachments||[]).length,rem=(t.reminders||[]).length;
+  const labs=t.labels||[],att=(t.attachments||[]).length,rem=(t.reminders||[]).length;
   const meta=h>=56&&(labs.length||att||it.repeat||rem)?'<div class="blk-m">'+
       (it.repeat?'<span title="Repeats">'+ic('rep')+'</span>':'')+(rem?'<span title="Reminder">'+ic('bell')+'</span>':'')+(att?'<span title="Attachment">'+ic('clip')+(att>1?att:'')+'</span>':'')+
       labs.map(l=>'<span class="bl" title="Label">'+ic('tag')+esc(l)+'</span>').join('')+'</div>':'';
