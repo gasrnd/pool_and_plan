@@ -75,6 +75,18 @@ button.pomo.due::after{background:var(--accent)}
 button.pomo.away{opacity:.6}
 button.pomo.off{font-style:italic}
 .chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+.att-box{display:flex;flex-direction:column;gap:4px}
+.att{display:flex;align-items:center;gap:8px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--surface);min-width:0}
+.att img{width:36px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 36px}
+.att-ic{width:36px;height:36px;display:grid;place-items:center;color:var(--mute);background:var(--sunk);border-radius:4px;flex:0 0 36px}
+.att-ic svg{width:16px;height:16px}
+.att-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.att-s{color:var(--mute);font-size:12px;flex:0 0 auto}
+.att-x{background:none;border:0;color:var(--mute);cursor:pointer;padding:2px 6px;border-radius:5px;flex:0 0 auto}
+.att-x:hover{color:var(--ink);background:var(--sunk)}.att-x.armed{color:var(--pri1)}
+.att-add{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;color:var(--mute);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:13px}
+.att-add:hover{color:var(--ink);background:var(--sunk)}.att-add svg{width:14px;height:14px}
+.att-add:focus-within{outline:2px solid var(--accent)}
 .done-bar{display:flex;gap:8px;align-items:center}.done-bar #done-q{flex:1 1 auto;min-width:0}.done-bar select{flex:0 0 auto;width:auto}
 .done-list{display:flex;flex-direction:column;gap:2px;max-height:62vh;overflow:auto;margin-top:6px}
 #dform h3.done-day{margin:12px 0 0;font-size:12px;font-weight:600;color:var(--mute);text-transform:none;letter-spacing:0}
@@ -589,7 +601,7 @@ function showConnect(msg){
   setTimeout(()=>{const i=$('#cname');if(i&&!i.value)i.focus();else{const t=$('#ctoken');if(t)t.focus()}},50);
 }
 async function tdFetch(acc,full){
-  const body=new URLSearchParams({sync_token:full?'*':acc.syncToken,resource_types:JSON.stringify(['user','projects','sections','items','reminders'])});
+  const body=new URLSearchParams({sync_token:full?'*':acc.syncToken,resource_types:JSON.stringify(['user','projects','sections','items','reminders','notes'])});
   let r;
   try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
   catch(e){const er=new Error('offline');er.code='offline';throw er}
@@ -600,11 +612,13 @@ async function tdFetch(acc,full){
 }
 function tdMerge(acc,j){
   if(!acc.raw.reminders)acc.raw.reminders=new Map();
+  if(!acc.raw.notes)acc.raw.notes=new Map();
+  if(j.full_sync)acc.raw.notes.clear();
   if(j.full_sync){acc.raw.projects.clear();acc.raw.sections.clear();acc.raw.items.clear()}
   if(j.full_sync)acc.raw.reminders.clear();
   if(j.user&&j.user.email)acc.email=j.user.email;
-  ['projects','sections','items','reminders'].forEach(k=>{
-    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k!=='items'&&k!=='reminders'&&o.is_archived))acc.raw[k].delete(o.id);else acc.raw[k].set(o.id,o)});
+  ['projects','sections','items','reminders','notes'].forEach(k=>{
+    (j[k]||[]).forEach(o=>{if(o.is_deleted||(k!=='items'&&k!=='reminders'&&k!=='notes'&&o.is_archived))acc.raw[k].delete(o.id);else acc.raw[k].set(o.id,o)});
   });
   if(j.sync_token)acc.syncToken=j.sync_token;
 }
@@ -667,6 +681,10 @@ function tdBuildInner(){TD.buildError='';
       else if(x.day){const ses={kind:'session',taskId:t.id,date:x.day,start:x.time,dur:x.dur||60,done:false,remind:10};if(x.repeat)ses.repeat=x.repeat;m.set('s:'+t.id,ses)}
       if(rs.reminders)task.reminders=rs.reminders;
       m.set(t.id,task);TD.taskAcc.set(t.id,ai);
+    });
+    (a.raw.notes||new Map()).forEach(n=>{
+      const f=n.file_attachment,t=f&&m.get(n.item_id);if(!t||t.kind!=='task'||!f.file_url)return;
+      (t.attachments=t.attachments||[]).push({noteId:n.id,name:f.file_name||'File',url:f.file_url,size:f.file_size||0,image:f.image||((/^image\//.test(f.file_type||'')||f.resource_type==='image')?f.file_url:'')});
     });
   });
   m.forEach((x,k)=>{if(x.kind!=='session')return;const t=m.get(x.taskId),rel=((t&&t.reminders)||[]).filter(r=>r.min!=null).map(r=>r.min);x.remind=rel.length?Math.min(...rel):-1});
@@ -755,7 +773,7 @@ async function tdFlushQueue(){
       const job=TD.queue[0],acc=TD.accounts[job.ai];
       if(!acc){TD.queue.shift();continue}
       job.cmds.forEach(c=>{const a=c.args;if(a)['id','item_id','parent_id','section_id','project_id'].forEach(k=>{if(a[k]&&TD.tempMap[a[k]])a[k]=TD.tempMap[a[k]]})});
-      const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items','reminders'])});
+      const body=new URLSearchParams({commands:JSON.stringify(job.cmds),sync_token:acc.syncToken||'*',resource_types:JSON.stringify(['user','projects','sections','items','reminders','notes'])});
       let r;
       try{r=await fetch('https://api.todoist.com/api/v1/sync',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:body})}
       catch(e){TD.sendError='offline';break}
@@ -1159,6 +1177,7 @@ function cardHtml(id,t,all){
   const subOpen=openSubs.has(id);
   if(subs.length)m.push('<button type="button" class="mi subt" data-act="toggleSubs" data-id="'+id+'" aria-expanded="'+subOpen+'" title="'+(subOpen?'Hide':'Show')+' subtasks">'+ic('sub')+subs.filter(e=>isDone(e[1])).length+'/'+subs.length+'<span class="car">'+(subOpen?'\u25be':'\u25b8')+'</span></button>');
   if(t.notes)mi('','note','');
+  if((t.attachments||[]).length)mi('','clip',t.attachments.length>1?String(t.attachments.length):'');
   (t.labels||[]).forEach(l=>mi('c-lab','tag',l));
   if(special()&&p){const s=(p.sections||[]).find(x=>x.id===t.sectionId);m.push('<span class="mi"><span class="dot p'+(p.color||0)+'"></span>'+esc(p.name+(s?' / '+s.name:''))+'</span>')}
   return '<div class="card'+(done?' is-done':'')+'" data-task="'+id+'" tabindex="0" role="button"><div class="card-top">'+
@@ -1884,6 +1903,40 @@ function openCompleted(){
     '<div id="done-list" class="done-list" aria-live="polite"></div>',null,{focus:false});
   doneLoadMore();
 }
+
+/* ---------- Attachments: files kept by Todoist (as comments holding only the file); shown here as a field of the task ---------- */
+function attHtml(id){
+  const t=items.get(id),list=(t&&t.attachments)||[];
+  return list.map((a,i)=>'<div class="att">'+
+      (a.image?'<img src="'+esc(a.image)+'" alt="" loading="lazy" onerror="this.remove()">':'<span class="att-ic">'+ic('clip')+'</span>')+
+      '<a href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer" class="att-n">'+esc(a.name)+'</a>'+
+      (a.size?'<span class="att-s">'+(a.size>1048576?(a.size/1048576).toFixed(1)+' MB':Math.max(1,Math.round(a.size/1024))+' KB')+'</span>':'')+
+      '<button type="button" class="att-x" data-act="attDel" data-id="'+esc(id)+'" data-i="'+i+'" aria-label="Remove '+esc(a.name)+'">✕</button></div>').join('')+
+    (TD.attBusy&&TD.attBusy[id]?'<div class="hint">Uploading '+esc(TD.attBusy[id])+'…</div>':'')+
+    '<label class="att-add"><input type="file" id="att-file" data-id="'+esc(id)+'" hidden multiple>'+ic('clip')+'<span>Attach file</span></label>';
+}
+function attRefresh(id){const box=$('#att-box');if(box&&box.dataset.id===id)box.innerHTML=attHtml(id)}
+async function attUpload(id,files){
+  const t=items.get(id),ai=tdAccOfTask(id,t),acc=TD.accounts[ai];if(!acc)return;
+  TD.attBusy=TD.attBusy||{};
+  for(const f of files){
+    TD.attBusy[id]=f.name;attRefresh(id);
+    try{
+      const fd=new FormData();fd.append('file',f,f.name);fd.append('file_name',f.name);
+      const r=await fetch('https://api.todoist.com/api/v1/uploads',{method:'POST',headers:{Authorization:'Bearer '+acc.token},body:fd});
+      if(!r.ok){toast(r.status===413?f.name+' is too big for your Todoist plan.':'Todoist didn’t accept '+f.name+' (error '+r.status+').');continue}
+      const u=await r.json();
+      const fa={file_name:u.file_name||f.name,file_type:u.file_type||f.type,file_url:u.file_url,resource_type:u.resource_type||'file'};
+      if(u.file_size)fa.file_size=u.file_size;
+      tdSend(ai,[{type:'note_add',uuid:tdUuid(),temp_id:'att-'+tdUuid(),args:{item_id:id,content:fa.file_name,file_attachment:fa}}]);
+      // show it right away; the next sync brings Todoist's own copy
+      const cur=items.get(id);if(cur){items.set(id,Object.assign({},cur,{attachments:(cur.attachments||[]).concat([{noteId:'',name:fa.file_name,url:fa.file_url||'',size:fa.file_size||f.size,image:/^image\//.test(fa.file_type||'')?fa.file_url:''}])}));touch();render()}
+    }catch(e){toast('Couldn’t upload '+f.name+': Todoist can’t be reached from here.')}
+  }
+  delete TD.attBusy[id];attRefresh(id);
+}
+form.addEventListener('change',e=>{if(e.target.id==='att-file'&&e.target.files.length)attUpload(e.target.dataset.id,[...e.target.files])});
+
 form.addEventListener('input',e=>{if(e.target.id==='done-q'){DONE.q=e.target.value;doneRender()}});
 form.addEventListener('change',e=>{if(e.target.id==='done-board'){DONE.board=e.target.value;doneRender()}});
 
@@ -1976,6 +2029,7 @@ function openTask(id,preset){
     '<input type="text" name="title" id="f-title" class="tk-title" value="'+esc(t.title)+'" placeholder="Task name" aria-label="Task name" autocomplete="off">'+
     '<div class="nview" id="f-nview" tabindex="0" role="button" aria-label="Edit description">'+(t.notes?fmtBlock(t.notes):'<span class="hint">Description</span>')+'</div>'+
     '<textarea name="notes" id="f-notes" rows="6" hidden aria-label="Description">'+esc(t.notes||'')+'</textarea>';
+  if(id&&TD.on)main+='<h3>Attachments</h3><div class="att-box" id="att-box" data-id="'+esc(id)+'">'+attHtml(id)+'</div>';
   if(id&&!parent)main+='<h3>Sub-tasks</h3>'+(subs.length?'<div class="list">'+subs.map(([sid,x])=>'<div class="li'+(isDone(x)?' is-done':'')+'"><button type="button" class="tk" data-act="toggleTask" data-id="'+sid+'" aria-label="Complete sub-task">'+(isDone(x)?'✓':'')+'</button><span>'+fmt(x.title,true)+'</span><button type="button" data-act="openTask" data-id="'+sid+'">Open</button></div>').join('')+'</div>':'')+
     '<div class="subadd"><input type="text" name="subTitle" id="f-subtitle" placeholder="Add sub-task" aria-label="New sub-task" autocomplete="off"><button type="button" class="mini" data-act="addSub" data-id="'+id+'" id="f-addsub">Add</button></div>';
   const quick=[['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['nextweek','Next week'],['none','No date']];
@@ -2206,6 +2260,10 @@ function openItem(id,occ){const it=items.get(id);if(!it)return;if(it.kind==='ses
 /* ---------- actions ---------- */
 const stepAnchor=n=>{const a=new Date(st.anchor);if(st.span==='month'){a.setDate(1);a.setMonth(a.getMonth()+n)}else a.setDate(a.getDate()+n*spanDays());st.anchor=a};
 const ACT={
+  attDel:b=>{const id=b.dataset.id,t=items.get(id);if(!t)return;const a=(t.attachments||[])[Number(b.dataset.i)];if(!a)return;
+    if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Remove?';b.classList.add('armed');return}
+    if(a.noteId)tdSend(tdAccOfTask(id,t),[{type:'note_delete',uuid:tdUuid(),args:{id:a.noteId}}]);
+    items.set(id,Object.assign({},t,{attachments:t.attachments.filter(x=>x!==a)}));touch();render();attRefresh(id);toast('Attachment removed.')},
   hideBoard:b=>{const n=b.dataset.v;TD.layout.hidden=[...new Set((TD.layout.hidden||[]).concat([n]))];tdSaveLayout();if(st.proj==='b:'+n){st.proj='@today';saveUi()}tdBuild();toast(n+' is hidden here. Its project in Todoist is untouched.')},
   showBoard:b=>{const n=b.dataset.v;TD.layout.hidden=(TD.layout.hidden||[]).filter(x=>x!==n);tdSaveLayout();tdBuild()},
   pickProj:b=>{st.proj=b.dataset.v;saveUi();render()},
