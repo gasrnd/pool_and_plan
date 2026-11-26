@@ -67,8 +67,11 @@
     const liveSecs = (sections || []).filter(s => !s.is_deleted && !s.is_archived)
       .sort((a, b) => (a.section_order || 0) - (b.section_order || 0));
     const containerIds = [];
+    const placed = (layout && layout.projectBoards) || {};   // projectId -> board: show that project as one list there
     live.forEach(p => {
-      const c = classifyProject(p);
+      let c = classifyProject(p);
+      const to = placed[p.id];
+      if (to && c.kind === 'board') c = { kind: 'linked', board: String(to).trim().toUpperCase(), list: String(p.name || '').trim(), placed: true };
       projectRole.set(p.id, c);
       if (c.kind === 'inbox') inboxProjectId = p.id;
       if (c.kind === 'container') containerIds.push(p.id);

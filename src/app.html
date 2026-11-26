@@ -70,6 +70,7 @@ button.pomo.due::after{background:var(--accent)}
 button.pomo.away{opacity:.6}
 button.pomo.off{font-style:italic}
 .chkrow{display:flex;gap:8px;align-items:center;cursor:pointer}
+.pbrow{display:flex;align-items:center;gap:12px}.pbrow>span{flex:1 1 auto;min-width:6em;font-weight:600}.pbrow>select{flex:0 0 auto;width:auto;max-width:65%}
 .done-bar{display:flex;gap:8px;align-items:center}.done-bar #done-q{flex:1 1 auto;min-width:0}.done-bar select{flex:0 0 auto;width:auto}
 .done-list{display:flex;flex-direction:column;gap:2px;max-height:62vh;overflow:auto;margin-top:6px}
 #dform h3.done-day{margin:12px 0 0;font-size:12px;font-weight:600;color:var(--mute);text-transform:none;letter-spacing:0}
@@ -616,9 +617,14 @@ function tdBuild(){
 }
 function tdBuildInner(){TD.buildError='';
   const P=window.PPMap,m=new Map(),merged=new Map();TD.taskAcc=new Map();
-  const structs=TD.accounts.map(a=>P.buildStructure([...a.raw.projects.values()],[...a.raw.sections.values()],null));
-  const main=TD.accounts[0],S0=structs[0];
-  const set=main&&S0?P.readSettings([...main.raw.items.values()],S0):{values:{},ids:{}},v=set.values;TD.settings=set;
+  const first=TD.accounts.map(a=>P.buildStructure([...a.raw.projects.values()],[...a.raw.sections.values()],null));
+  const main=TD.accounts[0];
+  const set=main&&first[0]?P.readSettings([...main.raw.items.values()],first[0]):{values:{},ids:{}},v=set.values;TD.settings=set;
+  const layoutNow=Object.assign({},v.Layout||{},TD.layoutPending||{}),pb=layoutNow.projectBoards||{};
+  const structs=TD.accounts.map((a,ai)=>{
+    const mine={};Object.keys(pb).forEach(k=>{const i=k.lastIndexOf('|');if(i>0&&k.slice(0,i)===(a.email||''))mine[k.slice(i+1)]=pb[k]});
+    return Object.keys(mine).length?P.buildStructure([...a.raw.projects.values()],[...a.raw.sections.values()],{projectBoards:mine}):first[ai];
+  });
   const many=TD.accounts.length>1;
   structs.forEach((S,ai)=>S.boards.forEach(b=>{
     if(!merged.has(b.name))merged.set(b.name,{name:b.name,lists:[],first:merged.size});
@@ -895,6 +901,7 @@ $('#cform').addEventListener('submit',async e=>{
   if(err){showConnect(err);return}
   $('#connect').hidden=true;$('#ctoken').value='';
 });
+const P0kind=p=>{try{return window.PPMap.classifyProject(p).kind}catch(e){return ''}};
 function openAccounts(){
   curTask=null;reopen=openAccounts;
   if(!window.PPMap){openDlg('Accounts','<div class="hint">Todoist accounts can be connected on the website version of Pool &amp; Plan.</div>',null);return}
@@ -904,8 +911,18 @@ function openAccounts(){
     '<div class="row acc-new" id="acc-new-'+i+'" hidden><input type="text" name="username" autocomplete="username" value="'+esc(accName(a))+'" hidden aria-hidden="true" tabindex="-1">'+
     '<input type="password" id="acc-tok-'+i+'" autocomplete="current-password" placeholder="New Todoist API token" aria-label="New token for '+esc(accName(a))+'">'+
     '<button type="button" data-act="tdRetokenSave" data-id="'+i+'">Save token</button></div></div>').join('');
+  const boardNames=[...new Set(byKind('project').map(e=>e[1].name).concat(TD.layout.boards||[]))].filter(n=>!TD.accounts.some((a,ai)=>ai>0&&[...a.raw.projects.values()].some(p=>String(p.name).trim()===n&&!p.is_deleted&&P0kind(p)==='board'))).sort();
+  const pb=TD.layout.projectBoards||{};
+  const places=TD.accounts.map((a,ai)=>{
+    if(ai===0||!a.email)return '';
+    const projs=[...a.raw.projects.values()].filter(p=>!p.is_deleted&&!p.is_archived&&P0kind(p)==='board');
+    if(!projs.length)return '';
+    return '<h3>Projects of '+esc(accName(a))+'</h3><div class="hint">Show each project as its own board, or as one list on a board you choose.</div>'+
+      projs.map(p=>{const k=a.email+'|'+p.id;return '<label class="li pbrow"><span>'+esc(p.name)+'</span><select data-pb="'+esc(k)+'" aria-label="Where to show '+esc(p.name)+'"><option value="">Its own board</option>'+
+        boardNames.map(n=>'<option value="'+esc(n)+'"'+(pb[k]===n?' selected':'')+'>List on '+esc(n)+'</option>').join('')+'</select></label>'}).join('');
+  }).join('');
   const body='<div class="hint">The main account\u2019s Inbox and NOTES Config settings are used; the others contribute their lists. Boards with the same name are shown together; each list stays in its own account.</div>'+
-    '<div class="list">'+(rows||'<div class="hint">No accounts connected.</div>')+'</div><div class="hint" id="f-accmsg"></div><h3>Add an account</h3>'+
+    '<div class="list">'+(rows||'<div class="hint">No accounts connected.</div>')+'</div><div class="hint" id="f-accmsg"></div>'+places+'<h3>Add an account</h3>'+
     '<input type="text" id="f-accname" name="username" autocomplete="username" placeholder="Account name, e.g. gas_rnd" aria-label="Account name">'+
     '<input type="password" id="f-acctoken" name="password" autocomplete="current-password" placeholder="Todoist API token" aria-label="Todoist API token">'+
     '<div class="hint" id="f-accerr"></div>';
@@ -1868,6 +1885,15 @@ function openCompleted(){
   doneLoadMore();
 }
 form.addEventListener('input',e=>{if(e.target.id==='done-q'){DONE.q=e.target.value;doneRender()}});
+form.addEventListener('change',e=>{
+  const k=e.target.dataset&&e.target.dataset.pb;if(!k)return;
+  const pb=Object.assign({},TD.layout.projectBoards||{}),v=e.target.value,name=e.target.closest('.li').querySelector('span').textContent;
+  if(v)pb[k]=v;else delete pb[k];
+  TD.layout.projectBoards=pb;
+  if(v)TD.layout.hidden=(TD.layout.hidden||[]).filter(x=>x!==name.trim());   // it is a list now, no longer a hidden board
+  tdSaveLayout();tdBuild();
+  toast(v?name+' now shows as a list on '+v+'.':name+' shows as its own board again.');
+});
 form.addEventListener('change',e=>{if(e.target.id==='done-board'){DONE.board=e.target.value;doneRender()}});
 
 form.addEventListener('submit',e=>{e.preventDefault();if(onSave&&onSave(new FormData(form))!==false)dlg.close()});
