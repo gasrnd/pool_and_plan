@@ -12,6 +12,9 @@ reset = (':root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padd
          'body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}')
 out = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
+       '<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" href="icons/icon-192.png">\n<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">\n'
+       '<meta name="theme-color" content="#E8EBF0" media="(prefers-color-scheme: light)">\n<meta name="theme-color" content="#121820" media="(prefers-color-scheme: dark)">\n'
+       '<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-title" content="Pool &amp; Plan">\n<meta name="apple-mobile-web-app-status-bar-style" content="default">\n'
        '<style>' + reset + '</style>\n' + head.strip() + '\n<script src="todoist-mapping.js"></script>\n</head>\n<body>'
        + body.rstrip() + '\n</body>\n</html>\n')
 open(os.path.join(here, 'index.html'), 'w', encoding='utf-8').write(out)

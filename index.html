@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#E8EBF0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121820" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pool &amp; Plan">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Pool &amp; Plan</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
@@ -403,6 +412,8 @@ dialog::backdrop{background:rgba(10,14,20,.45)}
 @media (max-width:560px){
   #main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,2fr) minmax(0,3fr)}
   #split{display:none}
+  #board.hz{grid-auto-columns:calc(100% - 4px)}
+  #board.hz:has(.lane + .lane + .lane){grid-auto-columns:88%}
   #main.board{grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr)}
   #main.board #index{display:none}
   #main.board #proj-sel{display:block}
@@ -564,6 +575,8 @@ try{['ui','items','alerted'].forEach(k=>{const o='poolweek.'+k,n='poolplan.'+k,v
 let items=new Map(), col=null, local=false, loaded=false, note='', readOnly=false, timeRulesRan=false;
 const st=Object.assign({view:'plan',span:'week',proj:'@today',label:'',sort:'manual',unsched:false,showDone:false},lsGet('poolplan.ui')||{});
 st.anchor=new Date();
+// Opened from the home-screen icon (start address ?app=1): start on today, with the Today list and today's agenda
+try{if(new URLSearchParams(location.search).get('app')==='1'){st.view='plan';st.span='day';st.proj='@today';history.replaceState(null,'',location.pathname+location.hash)}}catch(e){}
 const saveUi=()=>lsSet('poolplan.ui',{view:st.view==='zones'?'plan':st.view,span:st.span,proj:st.proj});
 const LS='poolplan.items';
 const queues=new Map();
@@ -1335,7 +1348,8 @@ function renderCal(){
   const cal=$('#cal'),keepT=cal.scrollTop,keepL=cal.scrollLeft;
   if(st.span==='month'){renderMonth(cal);cal.scrollTop=keepT;return}
   const days=visDays(),today=tdy(),wide=days.length>1;
-  const cols='grid-template-columns:64px repeat('+days.length+',minmax('+(wide?'64px':'0')+',260px))';
+  const phone=window.matchMedia&&matchMedia('(max-width:560px)').matches;   // on a phone the days use the whole width
+  const cols='grid-template-columns:64px repeat('+days.length+',minmax('+(wide?'64px':'0')+','+(phone?'1fr':'260px')+'))';
   const keys=days.map(ymd);
   doneEvWanted(keys[0],keys[keys.length-1]);
   const events=byKind('event'),sessions=byKind('session'),bands=byKind('band');
