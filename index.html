@@ -1564,6 +1564,17 @@ function searchOpen(id){const q=$('#q');q.value='';searchRender();q.blur();if(id
   });
 })();
 
+/* ---------- faster sideways scrolling on the board (trackpad swipes and Shift + wheel); up/down is left alone ---------- */
+const HSPEED=2.5;
+$('#board').addEventListener('wheel',e=>{
+  const b=e.currentTarget;if(b.scrollWidth<=b.clientWidth+1||e.ctrlKey)return;
+  let dx=e.deltaX,dy=e.deltaY;
+  if(e.shiftKey&&!dx){dx=dy;dy=0}
+  if(Math.abs(dx)<=Math.abs(dy))return;
+  const unit=e.deltaMode===1?16:e.deltaMode===2?b.clientWidth:1;
+  e.preventDefault();b.scrollLeft+=dx*unit*HSPEED;
+},{passive:false});
+
 /* ---------- mutations + rules ---------- */
 function nextOrder(){return byKind('task').reduce((m,e)=>Math.max(m,e[1].order||0),0)+1}
 function addTask(title,extra){
