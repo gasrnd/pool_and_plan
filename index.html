@@ -831,8 +831,28 @@ async function tdFlushQueue(){
       }
       if(j.temp_id_mapping){Object.assign(TD.tempMap,j.temp_id_mapping);const ids=TD.settings&&TD.settings.ids;if(ids)Object.keys(ids).forEach(k=>{if(j.temp_id_mapping[ids[k]])ids[k]=j.temp_id_mapping[ids[k]]})}
       tdMerge(acc,j);acc.lastOk=Date.now();TD.lastOk=Date.now();TD.sendError='';
+      tdCheckDur(job,acc,j);
     }
   }finally{TD.sending=false;tdSaveQueue();if(changed&&!TD.dirty.size)tdBuild();else renderStrip()}
+}
+// Todoist answers a save with the task as it kept it. If a duration we sent is missing there, send it once more on its own;
+// if it still doesn't stick, say so, so a 3-hour block never quietly turns into 1 hour.
+TD.durRetry=new Set();
+function tdCheckDur(job,acc,j){
+  const fix=[],ok=j.sync_status||{};
+  job.cmds.forEach(c=>{
+    const a=c.args,d=a&&a.duration;if(!d||d.unit!=='minute'||(c.type!=='item_add'&&c.type!=='item_update')||ok[c.uuid]!=='ok')return;
+    const rid=c.type==='item_add'?(TD.tempMap[c.temp_id]||c.temp_id):a.id,it=acc.raw.items.get(rid);
+    if(!it||(it.duration&&it.duration.unit==='minute'&&it.duration.amount===d.amount))return;
+    const name=plainText(it.content||'').slice(0,60);
+    if(TD.durRetry.has(rid)){TD.durRetry.delete(rid);toast('Todoist didn\u2019t keep the duration of \u201c'+name+'\u201d ('+durText(d.amount)+'). It shows as 1 h for now.');console.warn('Duration not kept',rid,d,it.duration,it.due);return}
+    TD.durRetry.add(rid);
+    const args={id:rid,duration:{amount:d.amount,unit:'minute'}};
+    if(it.due&&it.due.date&&!it.due.is_recurring)args.due={date:it.due.date};
+    fix.push({type:'item_update',uuid:tdUuid(),args:args});
+  });
+  if(fix.length)TD.queue.push({ai:job.ai,email:job.email,cmds:fix});
+  else job.cmds.forEach(c=>{const a=c.args;if(a&&a.duration){const rid=c.type==='item_add'?(TD.tempMap[c.temp_id]||c.temp_id):a.id;TD.durRetry.delete(rid)}});
 }
 // Settings live in NOTES Config of the main account, one task per setting.
 function tdSaveSetting(name,value,now){
@@ -1934,6 +1954,7 @@ function syncForm(){
   if(!el.kind)fl.add('event');
   if(el.allDay)fl.add(el.allDay.checked&&!fl.has('session')?'allday':'timed');
   if(el.taskId&&el.taskId.value==='')fl.add('newtask');
+  if(!fl.has('session')||fl.has('newtask'))fl.add('pri');
   if(el.projectId&&el.sectionId&&el.sectionId.dataset.forp!==el.projectId.value){el.sectionId.innerHTML=secOpts(el.projectId.value,el.sectionId.dataset.cur);el.sectionId.dataset.forp=el.projectId.value}
   form.querySelectorAll('[data-when]').forEach(n=>{n.hidden=!n.dataset.when.split(' ').every(x=>fl.has(x))});
   form.querySelectorAll('[data-t]').forEach(n=>{const i=form.querySelector('.tf[data-g="'+n.dataset.t+'"] input'),noT=!!i&&!i.value;if(noT)n.hidden=true;else if(!n.dataset.when)n.hidden=false});
@@ -2283,6 +2304,7 @@ function tdMigrateEventLabels(){
 /* ---------- New event: from an empty spot in the month view ---------- */
 const DAYOPTS=[1,2,3,4,5,6,7,8,9,10,12,14,21,28];
 // One "Duration" field: minutes and hours when a time is set; days otherwise, or a last day picked on a calendar
+const priSel=(id,cur)=>'<label class="fld"><span>Priority</span><select name="priority" id="'+id+'">'+opts([[1,'Priority 1'],[2,'Priority 2'],[3,'Priority 3'],[4,'Priority 4']],cur||4)+'</select></label>';
 function durField(pre,dur,days){
   days=Math.max(1,days||1);const dl=DAYOPTS.includes(days)?DAYOPTS:DAYOPTS.concat([days]).sort((a,b)=>a-b);
   return '<div class="fld dur-fld"><span>Duration</span>'+
@@ -2314,18 +2336,19 @@ function openNewEvent(day){
     '<div class="fld"><span>Type</span><div class="seg evseg" role="radiogroup" aria-label="Event type">'+EVCATS.map((c,i)=>'<label class="evc'+(i+1)+' pr4"><input type="radio" name="evtype" value="'+c[0]+'"><span>'+c[0]+'</span></label>').join('')+'</div></div>'+
     '<div class="row"><label class="fld"><span>Day</span><input type="date" name="day" id="ne-day" value="'+esc(day)+'"></label>'+
     '<label class="fld"><span>Time</span>'+timeFld('time','ne-time','','m')+'</label>'+
-    durField('ne',60,1)+'</div>',
+    durField('ne',60,1)+'</div>'+
+    '<div class="row">'+priSel('ne-priority',4)+'</div>',
     fd=>{createEvent(fd);return false},{saveLabel:'Add event'});
 }
 async function createEvent(fd,repeat){
   const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return}
   if(!fd.get('evtype')){toast('Pick the type of event: ev, evS, evC or evH.');const g=$('.evseg');if(g){g.classList.add('need');setTimeout(()=>g.classList.remove('need'),1500)}return}
   const cat=fd.get('evtype'),day=fd.get('day')||tdy(),time=fd.get('time')||'',dur=Number(fd.get('dur'))||60,days=Math.max(1,Number(fd.get('days'))||1);
-  if(!TD.on){const id=addTask(title,{labels:[cat],day:time?'':day,days:time?1:days,recur:time?null:repeat||null});if(time)addSession(id,day,toMin(time),dur,repeat||null,-1);dlg.close();return}
+  if(!TD.on){const id=addTask(title,{priority:Math.min(4,Math.max(1,Number(fd.get('priority'))||4)),labels:[cat],day:time?'':day,days:time?1:days,recur:time?null:repeat||null});if(time)addSession(id,day,toMin(time),dur,repeat||null,-1);dlg.close();return}
   const btn=$('#dlg-save');btn.disabled=true;btn.textContent='Adding…';
   const sec=await ensureCalList(EVCATS.find(c=>c[0]===cat)[1]);
   if(!sec){btn.disabled=false;btn.textContent='Add event';return}
-  const id=nid(),task={kind:'task',title:title,notes:'',projectId:'b:CALENDAR',sectionId:sec,parentId:'',priority:4,labels:[cat],day:'',deadline:'',est:dur,done:false,order:nextOrder()};
+  const pri=Math.min(4,Math.max(1,Number(fd.get('priority'))||4)),id=nid(),task={kind:'task',title:title,notes:'',projectId:'b:CALENDAR',sectionId:sec,parentId:'',priority:pri,labels:[cat],day:'',deadline:'',est:dur,done:false,order:nextOrder()};
   const rm=fd.get('remind');if(time&&rm!=null&&rm!==''&&Number(rm)>=0)task.reminders=[{min:Number(rm)}];
   if(time){const se={kind:'session',taskId:id,date:day,start:toMin(time),dur:dur,done:false,remind:-1};if(repeat)se.repeat=repeat;items.set('s:'+id,se)}
   else{task.day=day;if(days>1)task.days=days;if(repeat)task.recur=repeat}
@@ -2531,13 +2554,14 @@ function openCal(id,preset,occ){
     '<label class="fld" data-when="timed"><span>Time</span>'+timeFld('time','f-time',hm(e.start==null?540:e.start))+'</label>'+
     '<label class="fld" data-when="timed" data-t="m"><span>Duration</span><select name="dur" id="f-dur">'+durOpts(e.dur||60)+'</select></label></div>'+
     '<div class="row"><label class="fld"><span>Repeat</span><select name="rep" id="f-rep">'+repOpts(e.repeat)+'</select></label>'+
-    '<label class="fld" data-when="timed" data-t="m"><span>Reminder</span><select name="remind" id="f-remind">'+remOpts(e.remind)+'</select></label></div>';
+    '<label class="fld" data-when="timed" data-t="m"><span>Reminder</span><select name="remind" id="f-remind">'+remOpts(e.remind)+'</select></label>'+
+    (TD.on&&!id?priSel('f-priority',4).replace('<label class="fld"','<label class="fld" data-when="'+'pri'+'"'):'')+'</div>';
   openDlg(id?'Event':'Add to calendar',body,fd=>{
     const date=fd.get('date');if(!date){toast('Pick a day.');return false}
     const noTime=!fd.get('time'),start=toMin(fd.get('time')),dur=Number(fd.get('dur'))||60,rep=repeatFrom(fd.get('rep'),date,e.repeat),remind=Number(fd.get('remind'));
     if(fd.get('kind')==='session'){
       let tid=fd.get('taskId');
-      if(!tid){const nt=String(fd.get('newTitle')||'').trim();if(!nt){toast('Pick a task or name a new one.');return false}tid=addTask(nt,{projectId:curPid(),est:dur})}
+      if(!tid){const nt=String(fd.get('newTitle')||'').trim();if(!nt){toast('Pick a task or name a new one.');return false}tid=addTask(nt,{projectId:curPid(),est:dur,priority:Number(fd.get('priority'))||4})}
       if(noTime){dayOnly(tid,date,rep);return true}
       addSession(tid,date,start,dur,rep,remind);
       if(TD.on&&remind>=0){const t=items.get(tid);if(t){const rs=(t.reminders||[]).filter(r=>r.min!==remind);put(tid,Object.assign({},t,{reminders:rs.concat([{min:remind}])}))}}
@@ -2546,7 +2570,7 @@ function openCal(id,preset,occ){
     const title=String(fd.get('title')||'').trim();if(!title){toast('Give the event a name.');return false}
     if(TD.on&&!id){   // with Todoist an event is a task labelled ev, evS, evC or evH, kept in its CALENDAR list
       const allDay=!!fd.get('allDay')||noTime,end=fd.get('end')||date,f2=new FormData();
-      f2.set('title',title);f2.set('evtype',fd.get('evtype')||'');f2.set('day',date);f2.set('time',allDay?'':fd.get('time'));f2.set('dur',String(dur));
+      f2.set('title',title);f2.set('evtype',fd.get('evtype')||'');f2.set('priority',fd.get('priority')||'4');f2.set('day',date);f2.set('time',allDay?'':fd.get('time'));f2.set('dur',String(dur));
       f2.set('days',String(allDay?Math.max(1,diffDays(date,end<date?date:end)+1):1));if(!allDay&&remind>=0)f2.set('remind',String(remind));
       createEvent(f2,rep);return false;
     }
